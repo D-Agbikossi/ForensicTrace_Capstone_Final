@@ -1,0 +1,26 @@
+{
+  "scenario": "scenario01",
+  "script": "scenario01_download_execute.sh",
+  "description": "Local HTTP server -> curl downloads payload -> chmod +x -> execute it",
+  "notes": "Steps are the attacker-relevant ACTIONS in the script. 'syscall' and 'target' say which recorded event evidences the action. 'after' restricts matching to events later than another step's event (the script cleans its work directory at start, so earlier events on the same path must not match). 'causal' relationships must be explainable by walking parent_event/resource_event links backwards from the later event; 'order' relationships only need correct time order.",
+  "workdir": "/tmp/ft_scenario01",
+  "steps": [
+    {"id": 1, "action": "curl process started", "kind": "process", "syscall": ["execve"], "target": "/curl$"},
+    {"id": 2, "action": "curl connects to local HTTP server", "kind": "network", "syscall": ["connect"], "target": "^127\\.0\\.0\\.1:8765$"},
+    {"id": 3, "action": "downloaded.sh created", "kind": "file", "syscall": ["openat", "open"], "target": "/downloaded\\.sh$", "detail": "flags=0x241", "after": 1},
+    {"id": 4, "action": "payload content written to downloaded.sh", "kind": "file", "syscall": ["write"], "target": "/downloaded\\.sh$", "after": 3},
+    {"id": 5, "action": "downloaded.sh closed", "kind": "file", "syscall": ["close"], "target": "/downloaded\\.sh$", "after": 3},
+    {"id": 6, "action": "chmod process started", "kind": "process", "syscall": ["execve"], "target": "/chmod$", "after": 1},
+    {"id": 7, "action": "downloaded.sh made executable", "kind": "file", "syscall": ["fchmodat", "chmod"], "target": "/downloaded\\.sh$", "after": 6},
+    {"id": 8, "action": "downloaded.sh executed", "kind": "process", "syscall": ["execve"], "target": "/downloaded\\.sh$", "after": 7}
+  ],
+  "relationships": [
+    {"from": 1, "to": 2, "type": "causal", "why": "same process: curl starts, then connects"},
+    {"from": 2, "to": 3, "type": "causal", "why": "same process: connection precedes saving the response"},
+    {"from": 3, "to": 4, "type": "causal", "why": "content written to the file just created"},
+    {"from": 3, "to": 5, "type": "causal", "why": "the same file is closed"},
+    {"from": 5, "to": 7, "type": "causal", "why": "chmod changes the file curl produced (data dependency across processes)"},
+    {"from": 6, "to": 7, "type": "causal", "why": "same process: chmod starts then calls fchmodat"},
+    {"from": 7, "to": 8, "type": "causal", "why": "the file made executable is the one executed"}
+  ]
+}

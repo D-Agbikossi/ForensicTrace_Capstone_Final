@@ -1,0 +1,22 @@
+{
+  "scenario": "scenario04",
+  "script": "scenario04_file_corruption.sh",
+  "description": "Create a file, overwrite its content, delete it",
+  "notes": "Both the creation and the overwrite are shell redirections (open with O_WRONLY|O_CREAT|O_TRUNC = flags 0x241); the shell closes the descriptor before the data is written, so close is evidenced but not ordered after write. See scenario01.json for the field meanings.",
+  "workdir": "/tmp/ft_scenario04",
+  "steps": [
+    {"id": 1, "action": "important.txt created", "kind": "file", "syscall": ["openat", "open"], "target": "/important\\.txt$", "detail": "flags=0x241"},
+    {"id": 2, "action": "important.txt closed after creation", "kind": "file", "syscall": ["close"], "target": "/important\\.txt$", "after": 1},
+    {"id": 3, "action": "original content written", "kind": "file", "syscall": ["write"], "target": "/important\\.txt$", "after": 1},
+    {"id": 4, "action": "important.txt reopened for overwrite", "kind": "file", "syscall": ["openat", "open"], "target": "/important\\.txt$", "detail": "flags=0x241", "after": 3},
+    {"id": 5, "action": "corrupting content written", "kind": "file", "syscall": ["write"], "target": "/important\\.txt$", "after": 4},
+    {"id": 6, "action": "important.txt deleted", "kind": "file", "syscall": ["unlinkat", "unlink"], "target": "/important\\.txt$", "after": 5}
+  ],
+  "relationships": [
+    {"from": 1, "to": 2, "type": "causal", "why": "the created file is closed"},
+    {"from": 1, "to": 3, "type": "causal", "why": "content written to the file just created"},
+    {"from": 3, "to": 4, "type": "order", "why": "the overwrite follows the original write"},
+    {"from": 4, "to": 5, "type": "causal", "why": "corrupting content written to the reopened file"},
+    {"from": 5, "to": 6, "type": "causal", "why": "the deleted file is the one that was corrupted (data dependency across processes)"}
+  ]
+}

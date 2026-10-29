@@ -1,0 +1,31 @@
+{
+  "scenario": "scenario03",
+  "script": "scenario03_network_payload.sh",
+  "description": "Local HTTP server -> curl fetches a file -> a payload script is written -> made executable -> executed",
+  "notes": "curl's output redirection means fetched.txt is opened by the shell BEFORE curl is executed. See scenario01.json for the field meanings.",
+  "workdir": "/tmp/ft_scenario03",
+  "steps": [
+    {"id": 1, "action": "fetched.txt created (shell redirection)", "kind": "file", "syscall": ["openat", "open"], "target": "/fetched\\.txt$", "detail": "flags=0x241"},
+    {"id": 2, "action": "curl process started", "kind": "process", "syscall": ["execve"], "target": "/curl$", "after": 1},
+    {"id": 3, "action": "curl connects to local HTTP server", "kind": "network", "syscall": ["connect"], "target": "^127\\.0\\.0\\.1:8766$", "after": 2},
+    {"id": 4, "action": "fetched content written to fetched.txt", "kind": "file", "syscall": ["write"], "target": "/fetched\\.txt$", "after": 3},
+    {"id": 5, "action": "runme.sh created", "kind": "file", "syscall": ["openat", "open"], "target": "/runme\\.sh$", "detail": "flags=0x241", "after": 4},
+    {"id": 6, "action": "payload content written to runme.sh", "kind": "file", "syscall": ["write"], "target": "/runme\\.sh$", "after": 5},
+    {"id": 7, "action": "runme.sh closed", "kind": "file", "syscall": ["close"], "target": "/runme\\.sh$", "after": 5},
+    {"id": 8, "action": "chmod process started", "kind": "process", "syscall": ["execve"], "target": "/chmod$", "after": 6},
+    {"id": 9, "action": "runme.sh made executable", "kind": "file", "syscall": ["fchmodat", "chmod"], "target": "/runme\\.sh$", "after": 8},
+    {"id": 10, "action": "runme.sh executed", "kind": "process", "syscall": ["execve"], "target": "/runme\\.sh$", "after": 9}
+  ],
+  "relationships": [
+    {"from": 1, "to": 2, "type": "causal", "why": "same forked process opens the redirect target then execs curl"},
+    {"from": 2, "to": 3, "type": "causal", "why": "same process: curl starts then connects"},
+    {"from": 3, "to": 4, "type": "causal", "why": "same process: response written after the connection"},
+    {"from": 1, "to": 4, "type": "causal", "why": "content written to the file opened for redirection"},
+    {"from": 4, "to": 5, "type": "order", "why": "payload creation follows the fetch"},
+    {"from": 5, "to": 6, "type": "causal", "why": "content written to the file just created"},
+    {"from": 5, "to": 7, "type": "causal", "why": "the same file is closed"},
+    {"from": 8, "to": 9, "type": "causal", "why": "same process: chmod starts then calls fchmodat"},
+    {"from": 6, "to": 9, "type": "causal", "why": "chmod changes the file that was written (data dependency across processes)"},
+    {"from": 9, "to": 10, "type": "causal", "why": "the file made executable is the one executed"}
+  ]
+}

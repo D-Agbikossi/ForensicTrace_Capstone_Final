@@ -1,0 +1,24 @@
+{
+  "scenario": "scenario02",
+  "script": "scenario02_privilege_escalation.sh",
+  "description": "Attempt to read /etc/shadow, write a fake passwd entry, delete it",
+  "notes": "The /etc/shadow open is matched whether it succeeds (root) or fails (EACCES): the ATTEMPT is the evidence. See scenario01.json for the field meanings.",
+  "workdir": "/tmp/ft_scenario02",
+  "steps": [
+    {"id": 1, "action": "cat process started to read /etc/shadow", "kind": "process", "syscall": ["execve"], "target": "/cat$"},
+    {"id": 2, "action": "/etc/shadow open attempted", "kind": "file", "syscall": ["openat", "open"], "target": "^/etc/shadow$", "after": 1},
+    {"id": 3, "action": "fake_passwd_entry created", "kind": "file", "syscall": ["openat", "open"], "target": "/fake_passwd_entry$", "detail": "flags=0x241", "after": 2},
+    {"id": 4, "action": "fake user record written", "kind": "file", "syscall": ["write"], "target": "/fake_passwd_entry$", "after": 3},
+    {"id": 5, "action": "fake_passwd_entry closed", "kind": "file", "syscall": ["close"], "target": "/fake_passwd_entry$", "after": 3},
+    {"id": 6, "action": "rm process started", "kind": "process", "syscall": ["execve"], "target": "/rm$", "after": 4},
+    {"id": 7, "action": "fake_passwd_entry deleted", "kind": "file", "syscall": ["unlinkat", "unlink"], "target": "/fake_passwd_entry$", "after": 6}
+  ],
+  "relationships": [
+    {"from": 1, "to": 2, "type": "causal", "why": "same process: cat starts then opens /etc/shadow"},
+    {"from": 2, "to": 3, "type": "order", "why": "the privileged read attempt precedes writing the fake record"},
+    {"from": 3, "to": 4, "type": "causal", "why": "record written to the file just created"},
+    {"from": 3, "to": 5, "type": "causal", "why": "the same file is closed"},
+    {"from": 6, "to": 7, "type": "causal", "why": "same process: rm starts then unlinks"},
+    {"from": 4, "to": 7, "type": "causal", "why": "the deleted file is the one that was written (data dependency across processes)"}
+  ]
+}
