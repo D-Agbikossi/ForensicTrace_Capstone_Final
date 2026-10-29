@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Summarise event counts by type; optional PNG bar chart (needs matplotlib)."""
+"""Summarise event counts by type; optional SVG bar chart (standard library only)."""
 
 from __future__ import annotations
 
 import argparse
 import json
-import sys
 from collections import Counter
+
+import svgchart
 
 
 def main() -> int:
@@ -15,7 +16,7 @@ def main() -> int:
     parser.add_argument(
         "-o",
         "--output",
-        help="Write PNG chart to this path (requires matplotlib)",
+        help="Write SVG chart to this path (e.g. events.svg)",
     )
     args = parser.parse_args()
 
@@ -33,25 +34,10 @@ def main() -> int:
     if not args.output:
         return 0
 
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError:
-        print(
-            "matplotlib not installed; text summary only. "
-            "Install: sudo apt install python3-matplotlib",
-            file=sys.stderr,
-        )
-        return 1
-
-    labels = list(counts.keys())
-    values = [counts[k] for k in labels]
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.bar(labels, values, color=["#2563eb", "#16a34a", "#ea580c", "#64748b"][: len(labels)])
-    ax.set_title(f"ForensicTrace events by type (config {config})")
-    ax.set_ylabel("Count")
-    ax.set_xlabel("Event type")
-    fig.tight_layout()
-    fig.savefig(args.output, dpi=120)
+    labels = sorted(counts)
+    svgchart.bar_panels([{"title": f"Events by type (config {config})", "labels": labels,
+                          "values": [counts[k] for k in labels], "xlabel": "Event type"}],
+                        args.output, cols=1, panel_w=460, panel_h=300)
     print(f"Wrote chart to {args.output}")
     return 0
 

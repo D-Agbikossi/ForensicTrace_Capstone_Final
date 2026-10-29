@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install deps, build forensictrace, run tests/run_tests.sh (Ubuntu/Debian).
+# Install deps, build forensictrace, run tests/run_tests.sh.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -7,7 +7,7 @@ cd "$ROOT"
 
 echo "==> Installing OS packages (may prompt for sudo)..."
 sudo apt update
-sudo apt install -y build-essential libssl-dev python3 curl valgrind python3-pandas python3-numpy python3-scipy python3-matplotlib
+sudo apt install -y build-essential libssl-dev python3 curl valgrind python3-pandas python3-numpy python3-scipy
 
 echo "==> Building ForensicTrace..."
 make clean

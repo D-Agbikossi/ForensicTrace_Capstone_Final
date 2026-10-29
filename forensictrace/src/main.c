@@ -7,7 +7,7 @@
 
 static void usage(void) {
     fprintf(stderr,
-        "ForensicTrace - ptrace-based incident reconstruction prototype\n"
+        "ForensicTrace 1.0 - Linux incident reconstruction (final product)\n"
         "\n"
         "Usage: forensictrace --config <A|B|C|D> --output <file.json> [options] -- <cmd> [args...]\n"
         "\n"
