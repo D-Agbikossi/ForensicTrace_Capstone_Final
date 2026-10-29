@@ -1,6 +1,5 @@
 /*
- * normaliser.c — turn raw collector events into the common event representation
- * described in the proposal (section 3.2.3):
+ * normaliser.c — turn raw collector events into the common event representation:
  *
  *   1. drop failed execve/execveat calls. execvp() tries every PATH directory,
  *      so a trace starts with a burst of failed exec attempts that executed

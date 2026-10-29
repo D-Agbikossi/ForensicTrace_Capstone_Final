@@ -1,5 +1,5 @@
 /*
- * metrics.c — FR10: CPU and memory measurement for one monitored run.
+ * metrics.c — CPU and memory measurement for one monitored run.
  *
  * RUSAGE_SELF      = ForensicTrace itself (the monitoring cost).
  * RUSAGE_CHILDREN  = the traced process tree that the tracer waited for
