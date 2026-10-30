@@ -141,8 +141,8 @@ ForensicTrace_Capstone_Final/
 The tool only traces commands you start yourself on a system you are authorised to use. Scenarios run in `/tmp` on a local machine, use a local HTTP server and contain no real malware or personal data. The seccomp mode sets `no_new_privs`, so set-uid programs lose privileges while traced.
 
 ## Deliverable
-- Technical walkthrough video: 
-- Technical report: 
+- Technical walkthrough video: https://drive.google.com/file/d/1ID3N1b3jwIulJSE1X0hy2pvBtg4W6FQB/view?usp=sharing
+- Technical report: https://drive.google.com/file/d/13Ui08B6avYQ_erADWaTfwDAMafVpY10D/view?usp=sharing
 
 # Author
 
