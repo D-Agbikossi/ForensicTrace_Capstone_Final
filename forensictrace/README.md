@@ -1,7 +1,7 @@
 # ForensicTrace (application)
 
 
-C11 Linux command-line tool (final product): `ptrace` or seccomp-filtered syscall collection → correlation → timeline → Markdown report → JSON + SHA-256 sidecar.
+CLI Linux command-line tool (final product): `ptrace` or seccomp-filtered syscall collection → correlation → timeline → Markdown report → JSON + SHA-256 sidecar.
 
 ## Quick start
 
@@ -64,7 +64,7 @@ docs/             Technical report (md + PDF), limitations, deployment guide, ex
 ## Documentation
 
 - [docs/deployment.md](docs/deployment.md) — step-by-step install, first trace, troubleshooting
-- [docs/technical_report.md](docs/technical_report.md) ([PDF](docs/technical_report.pdf)) — design, testing, results
+- [docs/technical_report.md](docs/technical_report.md) ([PDF](docs/ForensicTrace_Final_Technical Report.pdf)) — design, testing, results
 - [docs/limitations.md](docs/limitations.md) — threats to validity
 - [docs/examples/](docs/examples/) — a real scenario 4 trace, its report and timeline
 
