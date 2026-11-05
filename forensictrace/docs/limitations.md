@@ -105,12 +105,15 @@ behavioural variation.
 
 ## 7. Evidence integrity
 
-Integrity uses a SHA-256 sidecar. It detects accidental or later modification of
-the JSON file (a flipped bit, an appended byte and a truncated tail were all
-detected in every run), but it does not protect against an attacker who
-rewrites both the file and its sidecar. Tamper-evident logging schemes
-(hash chains, signing, remote anchoring) are outside the scope of this study,
-as the proposal states.
+The 64-run experiments used a SHA-256 sidecar. It detects accidental or later modification of
+the JSON file (a flipped bit, an appended byte and a truncated tail were all detected in every
+run), but it does not protect against an attacker who rewrites both the file and its sidecar.
+
+Later work added a hash chain, a signed manifest and an audit log, which close that gap as long
+as the verifier pins the signer's public key and the private key stays out of the attacker's reach.
+The experiments deliberately keep the sidecar-only format (`--baseline-format`), so the figures in
+this document do not include the custody cost. That cost is measured, along with the remaining
+limits (a compromised key, an untrusted clock, the unsigned audit log), in `docs/custody.md`.
 
 ## 8. Other scope limits (as stated in the proposal)
 

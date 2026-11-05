@@ -1,0 +1,23 @@
+{
+  "manifest_version": 1,
+  "tool": "ForensicTrace 1.0",
+  "session_id": "3bf05927-5186-4563-b8b6-d0eaa4ba9e75",
+  "case_id": "UNASSIGNED",
+  "investigator": "denaton-agbikossi",
+  "os_user": "denaton-agbikossi",
+  "hostname": "denaton-agbikossi-HP-Laptop-14-dq2xxx",
+  "kernel": "7.0.0-38-generic x86_64",
+  "started_utc": "2026-11-04T09:01:25.349765991Z",
+  "finished_utc": "2026-11-04T09:01:25.353005882Z",
+  "generated_utc": "2026-11-04T09:01:25.354409494Z",
+  "evidence": {
+    "file": "mp_B.json",
+    "sha256": "e4d0b51d33e8ce35966270d9e9b69fe5dfb9d1cfacabdb29edf318d357521591",
+    "bytes": 17947,
+    "event_count": 26,
+    "chain_genesis": "b5676a5fcc0ae27f3847124c6c340bd0fe8bb65033263fd600bed8f5ca67f5b9",
+    "chain_head": "902e5eaade978cac789c2b19682c606249b27789ced0f3b5720d0e05bc4b50f3"
+  },
+  "report": null,
+  "signature": null
+}

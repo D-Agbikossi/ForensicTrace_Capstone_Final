@@ -285,6 +285,26 @@ else
   pass "error handling: unwritable output"
 fi
 
+# --- 24 onward: custody attacks, incident reconstruction, dashboard ---
+# Each Python suite prints one [PASS]/[FAIL] line per check; a crash also counts as a failure.
+run_suite() {
+  local out="$TMP/suite.out" rc=0
+  python3 "$ROOT/tests/$1" >"$out" 2>&1 || rc=$?
+  while IFS= read -r line; do
+    case "$line" in
+      "[PASS] "*) pass "${line#\[PASS\] }" ;;
+      "[FAIL] "*) fail "${line#\[FAIL\] }" ;;
+      *) echo "$line" ;;
+    esac
+  done <"$out"
+  if [[ "$rc" -ne 0 ]] && ! grep -q '^\[FAIL\]' "$out"; then
+    fail "$1 crashed (exit $rc)"
+  fi
+}
+run_suite test_custody.py
+run_suite test_reconstruct.py
+run_suite test_dashboard.py
+
 echo "=== Results: $PASS passed, $FAIL failed ==="
 if [[ "$FAIL" -gt 0 ]]; then
   exit 1

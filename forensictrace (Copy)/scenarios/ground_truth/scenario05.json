@@ -1,0 +1,27 @@
+{
+  "scenario": "scenario05",
+  "script": "scenario05_multistage_intrusion.sh",
+  "description": "Suspicious script -> child downloads payload -> payload executed -> payload changes files -> payload connects out",
+  "notes": "Reconstruction demonstration, not part of the 64-run study. Field meanings as in scenario01.json.",
+  "workdir": "/tmp/ft_scenario05",
+  "steps": [
+    {"id": 1, "action": "curl started by the suspicious script", "kind": "process", "syscall": ["execve"], "target": "/curl$"},
+    {"id": 2, "action": "curl connects to the payload host", "kind": "network", "syscall": ["connect"], "target": "^127\\.0\\.0\\.1:8767$", "after": 1},
+    {"id": 3, "action": "update.sh created", "kind": "file", "syscall": ["openat", "open"], "target": "/ft_scenario05/update\\.sh$", "detail": "flags=0x241", "after": 2},
+    {"id": 4, "action": "payload content written", "kind": "file", "syscall": ["write"], "target": "/ft_scenario05/update\\.sh$", "after": 3},
+    {"id": 5, "action": "update.sh made executable", "kind": "file", "syscall": ["fchmodat", "chmod"], "target": "/ft_scenario05/update\\.sh$", "after": 4},
+    {"id": 6, "action": "update.sh executed", "kind": "process", "syscall": ["execve"], "target": "/ft_scenario05/update\\.sh$", "after": 5},
+    {"id": 7, "action": "persistence file created", "kind": "file", "syscall": ["openat", "open"], "target": "/victim/persistence\\.cron$", "detail": "flags=0x241", "after": 6},
+    {"id": 8, "action": "existing settings file appended", "kind": "file", "syscall": ["write"], "target": "/victim/settings\\.conf$", "after": 7},
+    {"id": 9, "action": "payload connects to the controller", "kind": "network", "syscall": ["connect"], "target": "^127\\.0\\.0\\.1:8768$", "after": 8}
+  ],
+  "relationships": [
+    {"from": 1, "to": 2, "type": "causal", "why": "same process: curl starts then connects"},
+    {"from": 2, "to": 3, "type": "causal", "why": "same process: connection precedes saving the response"},
+    {"from": 3, "to": 4, "type": "causal", "why": "content written to the file just created"},
+    {"from": 4, "to": 5, "type": "causal", "why": "chmod changes the file curl produced"},
+    {"from": 5, "to": 6, "type": "causal", "why": "the file made executable is the one executed"},
+    {"from": 6, "to": 7, "type": "causal", "why": "the payload's shell creates the persistence file"},
+    {"from": 7, "to": 9, "type": "order", "why": "file changes precede the outbound connection"}
+  ]
+}

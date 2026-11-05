@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ForensicTrace</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="data:,">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">ForensicTrace</div>
+  <label class="case-picker">
+    <span>Case</span>
+    <select id="case-select" aria-label="Open case"></select>
+  </label>
+  <button id="new-investigation" class="primary">New investigation</button>
+</header>
+<div class="shell">
+  <nav id="nav" aria-label="Views"></nav>
+  <main id="main" tabindex="-1">
+    <div id="case-header"></div>
+    <div id="view"></div>
+  </main>
+  <aside id="inspector" aria-label="Details" hidden></aside>
+</div>
+<div id="tooltip" role="status" hidden></div>
+<dialog id="investigate-dialog"></dialog>
+<script src="/app.js"></script>
+</body>
+</html>

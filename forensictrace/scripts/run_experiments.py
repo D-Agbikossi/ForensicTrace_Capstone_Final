@@ -96,7 +96,8 @@ def run_monitored(binary, cfg, sid, script, runs_dir, rep, mode):
         if f.exists():
             f.unlink()
     cmd = [str(binary), "--config", cfg, "--output", str(out), "--report", str(rep_md),
-           "--mode", mode, "--scenario", sid, "--quiet", "--", "bash", str(script)]
+           "--mode", mode, "--scenario", sid, "--quiet", "--baseline-format",
+           "--", "bash", str(script)]
     p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                        cwd=str(ROOT), text=True)
     return run_id, out, p.returncode, p.stderr

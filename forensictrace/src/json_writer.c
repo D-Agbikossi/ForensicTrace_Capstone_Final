@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-static void json_escape(FILE *f, const char *s)
+void ft_json_escape(FILE *f, const char *s)
 {
     for (; *s; s++) {
         unsigned char c = (unsigned char)*s;
@@ -88,7 +88,7 @@ int ft_ensure_parent_dirs(const char *filepath)
 static void str_field(FILE *f, const char *indent, const char *key, const char *val)
 {
     fprintf(f, "%s\"%s\": \"", indent, key);
-    json_escape(f, val);
+    ft_json_escape(f, val);
     fprintf(f, "\",\n");
 }
 
@@ -103,7 +103,7 @@ static int write_once(FTContext *c)
     }
 
     fprintf(f, "{\n");
-    fprintf(f, "  \"schema_version\": 2,\n");
+    fprintf(f, "  \"schema_version\": %d,\n", c->custody ? 3 : 2);
     fprintf(f, "  \"tool\": \"ForensicTrace %s\",\n", FT_VERSION);
     str_field(f, "  ", "scenario", c->scenario);
     str_field(f, "  ", "command", c->command);
@@ -135,13 +135,42 @@ static int write_once(FTContext *c)
     fprintf(f, "    \"total_ns\": %llu\n", (unsigned long long)c->process_ns);
     fprintf(f, "  },\n");
 
+    if (c->custody) {
+        fprintf(f, "  \"custody\": {\n");
+        str_field(f, "    ", "session_id", c->cust.session_id);
+        str_field(f, "    ", "case_id", c->cust.case_id);
+        str_field(f, "    ", "investigator", c->cust.investigator);
+        str_field(f, "    ", "os_user", c->cust.os_user);
+        str_field(f, "    ", "hostname", c->cust.hostname);
+        str_field(f, "    ", "kernel", c->cust.kernel);
+        str_field(f, "    ", "started_utc", c->cust.started_utc);
+        str_field(f, "    ", "finished_utc", c->cust.finished_utc);
+        str_field(f, "    ", "chain_algorithm", "sha256-length-prefixed-v1");
+        str_field(f, "    ", "chain_genesis", c->cust.genesis);
+        str_field(f, "    ", "chain_head", c->cust.head);
+        fprintf(f, "    \"chain_ns\": %llu\n", (unsigned long long)c->cust.chain_ns);
+        fprintf(f, "  },\n");
+    }
+
     fprintf(f, "  \"events\": [\n");
     for (int i = 0; i < c->count; i++) {
         Event *e = &c->events[i];
 
         fprintf(f, "    {\n");
+        if (c->custody) {
+            char uid[64];
+
+            ft_event_uid(c->cust.session_id, e->id, uid, sizeof(uid));
+            str_field(f, "      ", "event_uid", uid);
+        }
         fprintf(f, "      \"id\": %d,\n", e->id);
         fprintf(f, "      \"ts_ns\": %llu,\n", (unsigned long long)e->ts_ns);
+        if (c->custody) {
+            char wall[40];
+
+            ft_format_utc((int64_t)e->ts_ns + c->cust.wall_offset_ns, wall, sizeof(wall));
+            str_field(f, "      ", "ts_wall", wall);
+        }
         fprintf(f, "      \"type\": \"%s\",\n", ft_type_name(e->type));
         fprintf(f, "      \"syscall\": \"%s\",\n", e->syscall);
         fprintf(f, "      \"pid\": %d,\n", e->pid);
@@ -156,7 +185,12 @@ static int write_once(FTContext *c)
             fprintf(f, "      \"ret\": null,\n");
         }
         fprintf(f, "      \"parent_event\": %d,\n", c->parent_event[i]);
-        fprintf(f, "      \"resource_event\": %d\n", c->resource_event[i]);
+        fprintf(f, "      \"resource_event\": %d%s\n", c->resource_event[i],
+                c->custody ? "," : "");
+        if (c->custody) {
+            str_field(f, "      ", "prev_hash", i ? c->cust.event_hash[i - 1] : c->cust.genesis);
+            fprintf(f, "      \"event_hash\": \"%s\"\n", c->cust.event_hash[i]);
+        }
         fprintf(f, "    }%s\n", (i < c->count - 1) ? "," : "");
     }
     fprintf(f, "  ]\n");

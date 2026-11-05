@@ -1,0 +1,11 @@
+# Build artefacts
+*.o
+forensictrace/forensictrace
+forensictrace/forensictrace_asan
+/tmp/
+
+# Test and local output
+forensictrace/.test_out/
+__pycache__/
+*.pyc
+*.html

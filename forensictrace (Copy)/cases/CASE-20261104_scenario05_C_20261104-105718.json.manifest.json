@@ -1,0 +1,31 @@
+{
+  "manifest_version": 1,
+  "tool": "ForensicTrace 1.0",
+  "session_id": "855281a3-b0d2-4250-9162-2f3bb60ccb4d",
+  "case_id": "CASE-20261104",
+  "investigator": "denaton-agbikossi",
+  "os_user": "denaton-agbikossi",
+  "hostname": "denaton-agbikossi-HP-Laptop-14-dq2xxx",
+  "kernel": "7.0.0-38-generic x86_64",
+  "started_utc": "2026-11-04T08:57:18.395973228Z",
+  "finished_utc": "2026-11-04T08:57:18.997093843Z",
+  "generated_utc": "2026-11-04T08:57:19.015830265Z",
+  "evidence": {
+    "file": "CASE-20261104_scenario05_C_20261104-105718.json",
+    "sha256": "663d8207b6406a3b855ee5903ff053f53bab62c5cddcce5b0f520d77a461b254",
+    "bytes": 943306,
+    "event_count": 1428,
+    "chain_genesis": "55dc7bca745b9546466c3516a61427d35e61ce97580dca9feab273d21703a3df",
+    "chain_head": "5fdaebce2921db211a459120d0a2a2bbe4e1af35b23f87e29fc929a1e5e743b6"
+  },
+  "report": {
+    "file": "CASE-20261104_scenario05_C_20261104-105718.md",
+    "sha256": "cb31007b6ca76a3ee410d31c8cbe1ec6a3dd2b6ba6382bec69a58189533efbef"
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "public_key_b64": "OeajZbFLxp2pWYptUlgewtsaWXpoM1iytSKqgIoW90s=",
+    "key_fingerprint": "efc2d818115d28c05c52211f93246adf5d4fb72595a36fe4abd749263b05d86a",
+    "file": "CASE-20261104_scenario05_C_20261104-105718.json.manifest.sig"
+  }
+}

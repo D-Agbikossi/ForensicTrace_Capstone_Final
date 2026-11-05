@@ -26,6 +26,7 @@
 #include <linux/filter.h>
 #include <linux/seccomp.h>
 #include <sys/prctl.h>
+#include <arpa/inet.h>
 
 #include "forensictrace.h"
 
@@ -276,6 +277,7 @@ static void classify_event(Event *e, long syscall_num,
     case SYS_connect:
         snprintf(e->syscall, sizeof(e->syscall), "connect");
         e->type = EV_NETWORK;
+        e->sock_fd = (int)a0;
         {
             unsigned char sa[128];
             struct iovec local  = { .iov_base = sa, .iov_len = sizeof(sa) };
@@ -415,6 +417,72 @@ static int record_entry(FTContext *c, pid_t pid, const struct user_regs_struct *
     return record_event(c, &e);
 }
 
+/* Render one /proc/net address ("0100007F:1F90", or 32 hex digits for IPv6). */
+static int format_proc_addr(const char *hex, char *out, size_t outlen) {
+    const char *colon = strchr(hex, ':');
+    unsigned int port;
+    char ip[INET6_ADDRSTRLEN];
+
+    if (!colon || sscanf(colon + 1, "%x", &port) != 1) return -1;
+    if (colon - hex == 8) {
+        struct in_addr a;
+        if (sscanf(hex, "%8x", &a.s_addr) != 1) return -1;
+        if (!inet_ntop(AF_INET, &a, ip, sizeof(ip))) return -1;
+        snprintf(out, outlen, "%s:%u", ip, port);
+    } else if (colon - hex == 32) {
+        struct in6_addr a;
+        for (int w = 0; w < 4; w++) {
+            unsigned int word;
+            if (sscanf(hex + w * 8, "%8x", &word) != 1) return -1;
+            memcpy(&a.s6_addr[w * 4], &word, 4);
+        }
+        if (!inet_ntop(AF_INET6, &a, ip, sizeof(ip))) return -1;
+        snprintf(out, outlen, "[%s]:%u", ip, port);
+    } else {
+        return -1;
+    }
+    return 0;
+}
+
+/*
+ * Resolve a socket fd to protocol and both endpoints through /proc/<pid>/net,
+ * so the evidence records the source address and protocol of a connection.
+ * connect() and accept() arguments alone only reveal the far end.
+ */
+static void annotate_socket(Event *ev, int fd) {
+    static const char *const tables[] = {"tcp", "udp", "tcp6", "udp6"};
+    char target[64], link[64], path[256], line[512];
+    unsigned long want;
+
+    snprintf(link, sizeof(link), "/proc/%d/fd/%d", ev->pid, fd);
+    ssize_t n = readlink(link, target, sizeof(target) - 1);
+    if (n < 0) return;
+    target[n] = '\0';
+    if (sscanf(target, "socket:[%lu]", &want) != 1) return;
+
+    for (size_t t = 0; t < sizeof(tables) / sizeof(tables[0]); t++) {
+        snprintf(path, sizeof(path), "/proc/%d/net/%s", ev->pid, tables[t]);
+        FILE *fp = fopen(path, "r");
+        if (!fp) continue;
+        while (fgets(line, sizeof(line), fp)) {
+            char local[80], remote[80], loc[64], rem[64];
+            unsigned long inode;
+            if (sscanf(line, " %*d: %79s %79s %*x %*s %*s %*s %*d %*d %lu",
+                       local, remote, &inode) != 3 || inode != want) continue;
+            if (format_proc_addr(local, loc, sizeof(loc)) == 0 &&
+                format_proc_addr(remote, rem, sizeof(rem)) == 0) {
+                size_t l = strlen(ev->detail);
+                snprintf(ev->detail + l, sizeof(ev->detail) - l,
+                         "%ssocket=%lu proto=%.3s local=%s remote=%s",
+                         l ? " " : "", want, tables[t], loc, rem);
+            }
+            fclose(fp);
+            return;
+        }
+        fclose(fp);
+    }
+}
+
 /* Attach the return value to the entry event (and the child pid for spawns). */
 static void attach_return(FTContext *c, int idx, const struct user_regs_struct *regs) {
     if (idx < 0 || idx >= c->count) return;
@@ -427,6 +495,12 @@ static void attach_return(FTContext *c, int idx, const struct user_regs_struct *
         size_t l = strlen(ev->detail);
         snprintf(ev->detail + l, sizeof(ev->detail) - l,
                  "%schild=%ld", l ? " " : "", ev->ret);
+    }
+    if (c->custody) {
+        if (!strcmp(ev->syscall, "connect"))
+            annotate_socket(ev, ev->sock_fd);
+        else if (ev->ret >= 0 && (!strcmp(ev->syscall, "accept") || !strcmp(ev->syscall, "accept4")))
+            annotate_socket(ev, (int)ev->ret);
     }
 }
 
@@ -652,7 +726,10 @@ FTContext *ft_ctx_create(const char *config, const char *output, int verbose) {
     return c;
 }
 
-void ft_ctx_destroy(FTContext *c) { free(c); }
+void ft_ctx_destroy(FTContext *c) {
+    if (c) free(c->cust.event_hash);
+    free(c);
+}
 
 int ft_config_accepts(const char *config, const char *syscall_name) {
     int rank = config_rank(config);

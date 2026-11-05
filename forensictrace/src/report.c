@@ -205,8 +205,18 @@ int ft_report_write(FTContext *c)
     fprintf(f, "| Failed exec attempts removed | %d |\n", c->dropped_failed_exec);
     fprintf(f, "| Duration | %.3f ms |\n", (double)(c->end_ns - c->start_ns) / 1e6);
     fprintf(f, "| Evidence file | `%s` (%ld bytes) |\n", c->output_path, c->storage_bytes);
-    fprintf(f, "| SHA-256 | `%s` |\n\n", c->sha256_hex[0] ? c->sha256_hex : "(not computed)");
-    fprintf(f, "Verify integrity: `sha256sum -c %s.sha256`\n\n", c->output_path);
+    fprintf(f, "| SHA-256 | `%s` |\n%s", c->sha256_hex[0] ? c->sha256_hex : "(not computed)",
+            c->custody ? "" : "\n");
+    if (c->custody) {
+        fprintf(f, "| Case | %s |\n", c->cust.case_id);
+        fprintf(f, "| Investigator | %s |\n", c->cust.investigator);
+        fprintf(f, "| Session | `%s` |\n", c->cust.session_id);
+        fprintf(f, "| Started (UTC) | %s |\n", c->cust.started_utc);
+        fprintf(f, "| Hash-chain head | `%s` |\n\n", c->cust.head);
+        fprintf(f, "Verify integrity and custody: `forensictrace verify %s`\n\n", c->output_path);
+    } else {
+        fprintf(f, "Verify integrity: `sha256sum -c %s.sha256`\n\n", c->output_path);
+    }
 
     /* ---- process tree ---- */
     fprintf(f, "## 1. Process tree\n\n");

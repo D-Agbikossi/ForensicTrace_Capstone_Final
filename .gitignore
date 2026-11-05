@@ -9,3 +9,9 @@ forensictrace/.test_out/
 __pycache__/
 *.pyc
 *.html
+!forensictrace/dashboard/static/*.html
+
+# Investigations, exported bundles and signing keys stay local
+forensictrace/cases/
+forensictrace/exports/
+*.key

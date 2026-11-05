@@ -1,0 +1,26 @@
+{
+  "date_utc": "2026-10-29T14:33:03Z",
+  "kernel": "7.0.0-38-generic",
+  "machine": "x86_64",
+  "python": "3.12.3",
+  "cpu_count": 4,
+  "git_commit": "f61463d",
+  "mode": "seccomp",
+  "reps": 4,
+  "seed": 42,
+  "scenarios": [
+    "scenario01",
+    "scenario02",
+    "scenario03",
+    "scenario04"
+  ],
+  "configs": [
+    "A",
+    "B",
+    "C",
+    "D"
+  ],
+  "runs_completed": 64,
+  "runs_expected": 64,
+  "elapsed_s": 27.7
+}

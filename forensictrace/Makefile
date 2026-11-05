@@ -11,13 +11,15 @@ SRCS := src/main.c \
         src/metrics.c \
         src/report.c \
         src/json_writer.c \
-        src/integrity.c
+        src/integrity.c \
+        src/custody.c \
+        src/verify.c
 
 OBJS := $(SRCS:.c=.o)
 
 BIN := forensictrace
 
-.PHONY: all clean test asan
+.PHONY: all clean test asan dashboard keys
 
 all: $(BIN)
 
@@ -36,3 +38,11 @@ clean:
 
 test: $(BIN)
 	./tests/run_tests.sh
+
+# Web dashboard on http://127.0.0.1:8377 (reads the JSON evidence this binary writes)
+dashboard: $(BIN)
+	python3 dashboard/server.py
+
+# Investigator signing key used by the dashboard for new evidence
+keys: $(BIN)
+	./$(BIN) keygen --key $$HOME/.config/forensictrace/investigator.key

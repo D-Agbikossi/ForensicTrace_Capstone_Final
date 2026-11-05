@@ -1,0 +1,14 @@
+make[1]: Entering directory '/home/denaton-agbikossi/Documents/ForensicTrace_Capstone_Final/forensictrace'
+gcc -Wall -Wextra -std=c11 -O2 -D_GNU_SOURCE -I src -c -o src/main.o src/main.c
+gcc -Wall -Wextra -std=c11 -O2 -D_GNU_SOURCE -I src -c -o src/collector.o src/collector.c
+gcc -Wall -Wextra -std=c11 -O2 -D_GNU_SOURCE -I src -c -o src/normaliser.o src/normaliser.c
+gcc -Wall -Wextra -std=c11 -O2 -D_GNU_SOURCE -I src -c -o src/correlator.o src/correlator.c
+gcc -Wall -Wextra -std=c11 -O2 -D_GNU_SOURCE -I src -c -o src/reconstructor.o src/reconstructor.c
+gcc -Wall -Wextra -std=c11 -O2 -D_GNU_SOURCE -I src -c -o src/metrics.o src/metrics.c
+gcc -Wall -Wextra -std=c11 -O2 -D_GNU_SOURCE -I src -c -o src/report.o src/report.c
+gcc -Wall -Wextra -std=c11 -O2 -D_GNU_SOURCE -I src -c -o src/json_writer.o src/json_writer.c
+gcc -Wall -Wextra -std=c11 -O2 -D_GNU_SOURCE -I src -c -o src/integrity.o src/integrity.c
+gcc -Wall -Wextra -std=c11 -O2 -D_GNU_SOURCE -I src -c -o src/custody.o src/custody.c
+gcc -Wall -Wextra -std=c11 -O2 -D_GNU_SOURCE -I src -c -o src/verify.o src/verify.c
+gcc -Wall -Wextra -std=c11 -O2 -D_GNU_SOURCE -I src -o forensictrace src/main.o src/collector.o src/normaliser.o src/correlator.o src/reconstructor.o src/metrics.o src/report.o src/json_writer.o src/integrity.o src/custody.o src/verify.o -lcrypto
+make[1]: Leaving directory '/home/denaton-agbikossi/Documents/ForensicTrace_Capstone_Final/forensictrace'

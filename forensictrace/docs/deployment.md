@@ -40,7 +40,7 @@ sudo apt install -y python3-pandas python3-numpy python3-scipy valgrind
 bash scripts/setup.sh
 ```
 
-You should see `Setup complete` and **23 tests passed**.
+You should see `Setup complete` and **120 tests passed**.
 
 **Option B — manual**
 
@@ -72,7 +72,7 @@ You do **not** need `sudo` for normal runs.
 **Output**
 
 - **Terminal:** timeline table  
-- **Files:** `/tmp/run.json` and `/tmp/run.json.sha256`
+- **Files:** `/tmp/run.json`, `/tmp/run.json.sha256`, and the custody files `/tmp/run.json.manifest.json` and `/tmp/run.json.audit.jsonl` (see [custody.md](custody.md))
 
 ---
 
@@ -83,7 +83,7 @@ sha256sum -c /tmp/run.json.sha256
 python3 scripts/view_timeline.py /tmp/run.json
 ```
 
-If verification prints `FAILED`, the JSON was changed after the run — capture again.
+If verification prints `FAILED`, the JSON was changed after the run — capture again. To see which records changed, run `./forensictrace verify /tmp/run.json`.
 
 Each JSON file includes `"truncated": true` if the run hit the 20,000-event cap (extra events were dropped).
 Parent directories for `--output` are created automatically (e.g. `/tmp/my_run/out.json`).
@@ -107,7 +107,18 @@ Other scripts: `scenarios/scenario01_download_execute.sh` (needs port **8765**),
 bash scripts/demo.sh
 ```
 
-It builds, runs the 23 tests and walks through tracing, integrity checking and scenario 4.
+It builds, runs the tests and walks through tracing, integrity checking, custody verification and scenario 4.
+
+---
+
+## Step 8 — Use the dashboard (optional)
+
+```bash
+make keys        # once: signing key in ~/.config/forensictrace/
+make dashboard   # then open http://127.0.0.1:8377
+```
+
+Select **New investigation** and run scenario 5. See [dashboard.md](dashboard.md). Scenario 5 needs ports **8767** and **8768**; the dashboard itself uses **8377**.
 
 ---
 
