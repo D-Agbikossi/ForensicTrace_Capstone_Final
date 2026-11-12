@@ -1,0 +1,14 @@
+# Built inside the image, or local only
+forensictrace
+forensictrace_asan
+**/*.o
+**/__pycache__
+.test_out
+cases
+exports
+*.key
+
+# The study's own reports are documents for assessors, not part of the online demo
+docs/*.pdf
+docs/technical_report.md
+docs/report_for_general_readers.md

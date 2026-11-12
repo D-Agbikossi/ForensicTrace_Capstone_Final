@@ -27,6 +27,7 @@ an isolated analysis machine. Options: `--port`, `--evidence-dir DIR` (repeatabl
 | Files | Files created, modified, read, deleted or denied, and by whom |
 | Configurations | A to D compared on quality, storage, CPU and processing time, from the study's results |
 | Chain of custody | Verification result, record-level problems, audit log, export |
+| Reports | A technical and a plain-language report for the selected investigation, in the browser or as PDF (`scripts/case_report.py`) |
 
 **New investigation** traces a listed scenario. To trace your own command, run the engine with
 `--output cases/name.json`; the file appears in the case list.
@@ -118,6 +119,8 @@ page. Starting a trace runs a program. So:
 - case ids must resolve to a file inside a known evidence folder;
 - all evidence reaches the page as text nodes, and the content security policy blocks inline script;
 - study runs and examples are read-only, so viewing them never changes the repository.
+
+For hosting, `--public` turns this into a read-only demo: it listens on all interfaces and accepts any address, but refuses every request that would trace, log or export. `docs/deployment.md` step 9 gives the steps.
 
 Viewing a case verifies it without writing to its audit log. Only **Verify and log** and
 **Export** add entries. There is no login, so anyone with a local account on the machine can reach

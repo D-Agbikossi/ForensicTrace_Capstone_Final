@@ -64,6 +64,7 @@ const api = {
 const TABS = [
   ["overview", "Overview"], ["graph", "Reconstruction"], ["timeline", "Timeline"], ["processes", "Process tree"],
   ["network", "Network"], ["files", "Files"], ["compare", "Configurations"], ["custody", "Chain of custody"],
+  ["reports", "Reports"],
 ];
 
 const state = {
@@ -350,7 +351,9 @@ function renderChainSummary(a) {
   }
   const weakest = edges.reduce((x, y) => (y.confidence < x.confidence ? y : x));
   return card("Attack chain", `${edges.length} linked steps, weakest link ${pct(weakest.confidence)} (rule-based score, not a measured probability)`,
-    h("button", { onclick: () => setTab("graph") }, "Open the reconstruction"));
+    h("div", { cls: "actions", style: "margin-top:0" },
+      h("button", { onclick: () => setTab("graph") }, "Open the reconstruction"),
+      h("button", { onclick: () => setTab("reports") }, "Get the case reports")));
 }
 
 function inspectFinding(f) {
@@ -1101,7 +1104,7 @@ function renderCustody(view) {
       try { const r = await api.post("/api/export", { id, investigator: who() }); result.textContent = `Exported ${r.files.length} files to ${r.directory}${r.verified ? "" : " (the failed verification is recorded in the bundle)"}.`; await loadCustody(id); } catch (err) { result.textContent = err.message; }
       e.target.disabled = false;
     } }, "Export evidence bundle") : null,
-    state.data && state.data.has_report ? h("a", { href: `/api/report?id=${encodeURIComponent(id)}`, download: "" }, h("button", null, "Download report")) : null)
+    state.data && state.data.has_report ? h("a", { href: `/api/report?id=${encodeURIComponent(id)}`, download: "" }, h("button", null, "Engine report (Markdown)")) : null)
     : h("p", { cls: "hint", style: "margin-top:8px" }, "This is read-only reference data, so verifying here adds nothing to its audit log.");
 
   const auditCard = c.audit.length ? card("Audit log", "Hash-chained record of who did what to this evidence",
@@ -1166,9 +1169,58 @@ function openInvestigate() {
 
 /* ---------- render ---------- */
 
+async function downloadCaseReport(kind, button, message) {
+  button.disabled = true;
+  message.replaceChildren(h("span", { cls: "spinner" }), "Preparing the PDF, this takes a few seconds");
+  try {
+    const r = await fetch(`/api/case-report?id=${encodeURIComponent(state.caseId)}&kind=${kind}&format=pdf`);
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      throw new Error(body.error || `HTTP ${r.status}`);
+    }
+    const disposition = r.headers.get("Content-Disposition") || "";
+    const name = (disposition.match(/filename="([^"]+)"/) || [])[1] || `${kind}_report.pdf`;
+    const url = URL.createObjectURL(await r.blob());
+    const link = h("a", { href: url, download: name });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    message.replaceChildren(`Downloaded ${name}`);
+  } catch (err) {
+    message.replaceChildren(err.message);
+  }
+  button.disabled = false;
+}
+
+async function renderReports(view) {
+  if (state.caseId) {
+    const reportCard = (kind, title, audience, summary) => {
+      const message = h("p", { cls: "hint", style: "margin-top:8px", role: "status" });
+      const button = h("button", { cls: "primary" }, "Download PDF");
+      button.addEventListener("click", () => downloadCaseReport(kind, button, message));
+      return h("section", { cls: `card ${kind}` }, h("h2", null, title), h("p", { cls: "card-sub" }, audience), h("p", null, summary),
+        h("div", { cls: "actions" }, button,
+          h("a", { href: `/api/case-report?id=${encodeURIComponent(state.caseId)}&kind=${kind}&format=html`, target: "_blank", rel: "noopener" },
+            h("button", { tabindex: -1 }, "Open in browser"))),
+        message);
+    };
+    view.append(h("p", { cls: "card-sub", style: "margin:0 0 14px" }, "Reports for the case selected above, built from its evidence."),
+      h("div", { cls: "report-cards" },
+        reportCard("technical", "Technical report", "For investigators and assessors",
+          "Case details, findings, the reconstructed sequence with its evidence and confidence, processes, network, files and chain of custody."),
+        reportCard("general", "Plain-language report", "For anyone, no technical background needed",
+          "What happened in everyday words, how serious it is, what was affected and whether the record can be trusted.")));
+  } else {
+    view.append(card("No case selected", null, h("p", null, "Open or run an investigation to get its reports.")));
+  }
+
+}
+
 function renderView() {
   const view = $("view");
   view.replaceChildren();
+  if (state.tab === "reports") { renderReports(view); return; }
   if (!state.caseId) {
     view.append(card("No evidence yet", null, h("p", null, "Select New investigation to trace a scenario, or run the engine with --output cases/name.json.")));
     return;
@@ -1193,6 +1245,11 @@ async function main() {
   try {
     state.session = await api.get("/api/session");
     api.token = state.session.token;
+    if (state.session.read_only) {
+      $("new-investigation").hidden = true;
+      $("main").insertBefore(notice("info", "Read-only demo",
+        "This online copy shows recorded evidence only. To run new investigations, run ForensicTrace on a Linux machine."), $("case-header"));
+    }
     const wanted = readHash();
     await loadCases();
     renderNav();

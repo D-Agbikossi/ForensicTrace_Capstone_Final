@@ -19,7 +19,7 @@ step "1/8 — Build"
 make clean
 make
 
-step "2/8 — Tests (expect 120 passed)"
+step "2/8 — Tests (expect 127 passed)"
 ./tests/run_tests.sh
 
 step "3/8 — CLI help"

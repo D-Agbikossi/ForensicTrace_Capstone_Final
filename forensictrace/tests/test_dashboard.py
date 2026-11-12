@@ -6,6 +6,7 @@ Prints one "[PASS] name" or "[FAIL] name" per check; run_tests.sh counts them.
 import http.client
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -126,6 +127,27 @@ def main():
             names = [f["path"] for f in body["analysis"]["files"]]
             report(status == 200 and any("onerror" in n for n in names), "evidence: hostile file name delivered as JSON data")
 
+            # ---- the study's own reports are not served to users --------------------------
+            gone = [api.request("GET", path)[0] for path in ("/api/documents", "/api/document?kind=technical",
+                                                             "/api/document?kind=general")]
+            report(gone == [404, 404, 404], "reports: only investigation reports are served, not the study reports")
+
+            # ---- per-case reports ---------------------------------------------------------
+            demo = "examples/custody_demo/demo_scenario05.json"
+            pages = {k: api.request("GET", f"/api/case-report?id={demo}&kind={k}&format=html") for k in ("technical", "general")}
+            tech, gen = pages["technical"][1], pages["general"][1]
+            report(pages["technical"][0] == 200 and b"Reconstructed sequence" in tech and b"update.sh" in tech
+                   and b"verified signed pinned" in tech, "case report: technical version built from the evidence")
+            report(pages["general"][0] == 200 and b"In short" in gen and b"downloaded a file named <b>update.sh</b>" in gen
+                   and b"<script" not in gen, "case report: plain-language version tells the story")
+            st, hostile_page, _ = api.request("GET", f"/api/case-report?id={hostile_id}&kind=technical&format=html")
+            report(st == 200 and b"<img src=x" not in hostile_page and b"&lt;img src=x" in hostile_page,
+                   "case report: hostile file name escaped")
+            st, pdf, hdr = api.request("GET", f"/api/case-report?id={demo}&kind=general&format=pdf")
+            browser = any(shutil.which(b) for b in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable"))
+            report((browser and st == 200 and pdf[:5] == b"%PDF-" and "attachment" in hdr.get("Content-Disposition", ""))
+                   or (not browser and st == 503), "case report: PDF download, or a clear message without Chromium")
+
             # ---- comparison matches the study's published conclusion -------------------
             status, body, _ = api.request("GET", "/api/compare?mode=ptrace&scenario=ALL")
             verdict = {c["config"]: c["sufficient"] for c in body["configs"]}
@@ -181,6 +203,33 @@ def main():
             server.terminate()
             _, err = server.communicate(timeout=5)
             report("Traceback" not in err and "internal" not in err, "dashboard: no server errors during the session", err[-300:])
+
+        # ---- public read-only mode, as used on a hosting platform ----------------
+        port = free_port()
+        env = dict(os.environ, PORT=str(port))
+        public = subprocess.Popen([sys.executable, str(ROOT / "dashboard" / "server.py"), "--public"],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, env=env)
+        web = Client(port)
+        try:
+            for _ in range(50):
+                try:
+                    web.request("GET", "/api/session")
+                    break
+                except OSError:
+                    time.sleep(0.1)
+            status, sess, _ = web.request("GET", "/api/session", headers={"Host": "forensictrace.example.org"})
+            web.token = sess.get("token")
+            st_case, body, _ = web.request("GET", "/api/custody?id=examples/custody_demo/demo_scenario05.json",
+                                           headers={"Host": "forensictrace.example.org"})
+            blocked = [web.request("POST", path, {"id": "examples/custody_demo/demo_scenario05.json", "scenario": "scenario04",
+                                                  "config": "C", "case_id": "X", "investigator": "t"})[0]
+                       for path in ("/api/investigate", "/api/verify", "/api/export")]
+            report(status == 200 and sess.get("read_only") and st_case == 200
+                   and body["verification"]["status"] == "verified_signed_pinned" and blocked == [403, 403, 403]
+                   and not body["writable"], "public mode: any address can read, nothing can run or change")
+        finally:
+            public.terminate()
+            public.communicate(timeout=5)
 
     return 1 if failures else 0
 

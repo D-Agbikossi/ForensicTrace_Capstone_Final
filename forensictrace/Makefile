@@ -19,7 +19,7 @@ OBJS := $(SRCS:.c=.o)
 
 BIN := forensictrace
 
-.PHONY: all clean test asan dashboard keys
+.PHONY: all clean test asan dashboard keys reports
 
 all: $(BIN)
 
@@ -46,3 +46,7 @@ dashboard: $(BIN)
 # Investigator signing key used by the dashboard for new evidence
 keys: $(BIN)
 	./$(BIN) keygen --key $$HOME/.config/forensictrace/investigator.key
+
+# Technical and general-reader reports as PDF (needs python3-markdown or markdown-it-py, and Chromium)
+reports:
+	python3 scripts/build_report.py all

@@ -87,18 +87,18 @@ involved. The key fingerprint is the SHA-256 of the 32 raw public key bytes.
 
 ## Measured cost
 
-Scenario 4 on the test laptop, one run per configuration:
+Measured on the test laptop on 11 November 2026: each of the four study scenarios was run three
+times in both formats under configurations C and D, ptrace mode (12 pairs per configuration):
 
-| Config | Events | Baseline file | With custody | Added per event | Chain time |
+| Config | Mean events | Extra storage | Extra per event | Chain time, mean (max) | Per event |
 |---|---|---|---|---|---|
-| A | 17 | 6.2 KB | 11.8 KB | 330 B | 0.12 ms |
-| C | 447 | 169 KB | 300 KB | 293 B | 2.07 ms |
-| D | 1,119 | 385 KB | 712 KB | 293 B | 5.07 ms |
+| C | 841 | +78% (77 to 78%) | 293 B | 3.7 ms (8.7) | 4.1 µs |
+| D | 2,448 | +85% (85 to 86%) | 292 B | 9.1 ms (15.5) | 3.7 µs |
 
-Storage grows by 78 to 91 percent, almost all of it hashes and identifiers. Chain time is
-about 4.5 microseconds per event. Hashing runs after the resource capture, so it is not charged
-to the workload metrics. Verifying the 1,119-event file took 17 ms. These are single runs,
-indicative only.
+The extra storage is almost all hashes and identifiers. Hashing runs after the resource capture,
+so it is not charged to the workload metrics. Verifying one file, including process start, took
+19 ms on average (maximum 41 ms) over 24 files of 841 to 2,448 events. These are small samples on
+one machine, indicative only. The same figures are in the technical report, section 4.
 
 ## What this does not protect against
 

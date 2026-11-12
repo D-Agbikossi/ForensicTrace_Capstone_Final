@@ -20,10 +20,16 @@ bash scripts/demo.sh
 ## Dashboard
 
 ```bash
-make dashboard  
+make dashboard   # http://127.0.0.1:8377
 ```
 
-See [docs/dashboard.md](docs/dashboard.md).
+The **Reports** page gives each investigation's technical and plain-language report, in the browser or as PDF. From the command line:
+
+```bash
+python3 scripts/case_report.py cases/run.json --kind general --pdf run_general.pdf   # or --kind technical
+```
+
+See [docs/dashboard.md](docs/dashboard.md). To publish a read-only copy online, see [docs/deployment.md](docs/deployment.md), step 9.
 
 ## Usage
 
@@ -65,19 +71,21 @@ Use **`Makefile`** in this directory (`make`). There is only one build file.
 ```
 src/              C source (collector, normaliser, correlator, reconstructor, report, metrics, JSON, integrity, custody, verify)
 dashboard/        Local web dashboard: server.py + static/
-tests/            run_tests.sh and the custody, reconstruction and dashboard suites (120 checks)
+tests/            run_tests.sh and the custody, reconstruction and dashboard suites (127 checks)
 scenarios/        Four study scenarios, one reconstruction demo, ground_truth/*.json
-scripts/          setup, demo, evaluate, run_experiments, analyze, reconstruct, svgchart, viewers, build_report
+scripts/          setup, demo, evaluate, run_experiments, analyze, reconstruct, case_report, svgchart, viewers, build_report
 experiments/      Raw evidence of the 64-run experiments (runs/ = ptrace, runs_seccomp/ = seccomp)
 results/          ptrace results: CSV, summary.md, tradeoff.svg, environment.json
 results_seccomp/  seccomp results, same layout
-docs/             Technical report (md + PDF), limitations, deployment guide, example trace
+docs/             Technical and general-reader reports (md + PDF), limitations, deployment, dashboard, custody, screenshots, examples
+Dockerfile        Read-only online demo of the dashboard
 ```
 
 ## Documentation
 
 - [docs/deployment.md](docs/deployment.md) — step-by-step install, first trace, troubleshooting
-- [docs/technical_report.md](docs/technical_report.md) ([PDF](docs/ForensicTrace_Final_Technical Report.pdf)) — design, testing, results
+- [docs/technical_report.md](docs/technical_report.md) ([PDF](docs/ForensicTrace_Technical_Report.pdf)) — design, testing, results
+- [docs/report_for_general_readers.md](docs/report_for_general_readers.md) ([PDF](docs/ForensicTrace_Report_for_General_Readers.pdf)) — the same study in plain language
 - [docs/limitations.md](docs/limitations.md) — threats to validity
 - [docs/dashboard.md](docs/dashboard.md) — dashboard, reconstruction rules, confidence scores
 - [docs/custody.md](docs/custody.md) — chain of custody, hash format, what it does not protect against

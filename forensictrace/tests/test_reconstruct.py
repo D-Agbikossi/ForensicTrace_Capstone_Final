@@ -153,6 +153,11 @@ def main():
         doc, r = trace(tmp, "devnull", "C", "/bin/sh", "-c", "curl -s -m 2 -o /dev/null http://127.0.0.1:1/")
         report(not r["answers"]["affected_files"] and not r["answers"]["downloads"], "control: /dev/null is not an affected file")
 
+        # a shell whose last command replaces it (exec) must be named by what it was at each step
+        doc, r = trace(tmp, "relabel", "C", "/bin/bash", "-c", f"/bin/true; echo x > {out_file}; rm -f {out_file}")
+        spawned = [e["summary"] for e in r["graph"]["edges"] if e["kind"] == "spawned"]
+        report(spawned and all(s.startswith("bash (") for s in spawned), "labels: a process is named by its program at that moment", str(spawned))
+
         # ---- schema 2 study runs still reconstruct ---------------------------------------
         old = reconstruct.load_evidence(ROOT / "experiments/runs/scenario01_C_r1.json")
         r = reconstruct.reconstruct(old)

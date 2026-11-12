@@ -130,9 +130,12 @@ class Reconstruction:
         self.relations.append(rel)
         return rel
 
-    def process_label(self, pid):
+    def process_label(self, pid, event=None):
+        """Name a process by the program it was running at `event`, or by its last program.
+        A shell that later execs another program (bash -c '...; rm x') changes name."""
         p = self.processes.get(pid)
-        return f"{base(p['exe']) if p and p['exe'] else 'process'} ({pid})"
+        exe = (event.get("exe") if event else None) or (p["exe"] if p else "")
+        return f"{base(exe) if exe else 'process'} ({pid})"
 
     # ---- stage 1: processes ---------------------------------------------------
 
@@ -383,7 +386,7 @@ class Reconstruction:
                         "fork/clone return value" if exact else "PPID of the child",
                         [{"label": "the parent's fork/clone returned exactly this PID", "value": 0.99}] if exact else
                         [{"label": "only the child's PPID links them; the spawn call was not captured", "value": 0.8}],
-                        f"{self.process_label(p['parent'])} started {self.process_label(pid)}")
+                        f"{self.process_label(p['parent'], ev[0] if exact else None)} started {self.process_label(pid)}")
 
         verbs = {"created": ("created", 0.98), "overwritten": ("overwrote", 0.98), "wrote": ("wrote", 0.95),
                  "read": ("read", 0.95), "deleted": ("deleted", 0.98), "chmod": ("changed mode of", 0.98),

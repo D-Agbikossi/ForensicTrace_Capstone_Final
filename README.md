@@ -4,11 +4,11 @@
 
 ## 1. Project overview
 
-This repository is the **final ForensicTrace product**: a C11 Linux command-line tool that implements the approved capstone scope (FR1–FR11, four evidence configurations, four controlled scenarios, and the evaluation pipeline). It is not an unfinished prototype and not an enterprise SIEM.
+This repository is the **final ForensicTrace product**: a C11 Linux tracing engine with a local web dashboard, implementing the approved capstone scope (FR1–FR11, four evidence configurations, four controlled scenarios, and the evaluation pipeline). It is not an unfinished prototype and not an enterprise SIEM.
 
 The tool runs a command under observation, records only the system calls that the chosen **evidence configuration** allows, correlates the events, prints an incident timeline, writes a Markdown forensic report, and stores each run as one JSON file with a SHA-256 integrity sidecar.
 
-On top of that engine, an analyst can now work from a **local web dashboard**, which reconstructs how an incident unfolded as a graph where every relationship cites its evidence and a confidence score. Evidence carries a **hash chain, a signed manifest and an audit log**. See section 3.1.
+On top of that engine, an analyst can now work from a **local web dashboard**, which reconstructs how an incident unfolded as a graph where every relationship cites its evidence and a confidence score. Every investigation produces a **technical and a plain-language report**, viewable in the browser or as PDF. Evidence carries a **hash chain, a signed manifest and an audit log**. A read-only copy of the dashboard can be **published online**. See section 3.1.
 
 It is also the experimental instrument for the study. Four evidence configurations (A process, B + file, C + network, D all syscalls) were run against four scripted incidents (download and execute, privilege-related activity, network payload, file corruption), 64 runs per collection mode, and scored against ground truth for event coverage, reconstruction accuracy, ordering, explainability, CPU, memory, storage and processing time.
 
@@ -44,7 +44,7 @@ Manual steps:
 sudo apt install -y build-essential libssl-dev python3 curl valgrind \
      python3-pandas python3-numpy python3-scipy
 make clean && make             # builds ./forensictrace with -Wall -Wextra
-make test                      # expect: 120 passed, 0 failed
+make test                      # expect: 127 passed, 0 failed
 ```
 
 Trace a command, verify the evidence and read the timeline:
@@ -75,6 +75,8 @@ make keys        # optional: signing key, stored in ~/.config/forensictrace/
 make dashboard   # open the local web application, then New investigation
 ```
 
+The **Reports** page gives the selected investigation's technical and plain-language reports, in the browser or as PDF. To publish a read-only copy online (Render) or run the full tool privately in GitHub Codespaces, follow [`docs/deployment.md`](forensictrace/docs/deployment.md), step 9.
+
 ![Attack chain reconstructed by the dashboard](forensictrace/docs/screenshots/reconstruction.png)
 
 From the command line:
@@ -85,6 +87,7 @@ KEY=~/.config/forensictrace/investigator.key
     --investigator "A. Analyst" --case CASE-042 --sign-key $KEY \
     -- bash scenarios/scenario05_multistage_intrusion.sh
 python3 scripts/reconstruct.py cases/run.json             # who, what, which files, which endpoints
+python3 scripts/case_report.py cases/run.json --kind general --pdf cases/run_general.pdf   # or --kind technical
 ./forensictrace verify cases/run.json --pubkey $KEY.pub   # names modified or missing records
 ./forensictrace export cases/run.json --to exports/CASE-042 --pubkey $KEY.pub
 python3 tests/test_custody.py                             # watch each tampering attack get caught
@@ -97,10 +100,10 @@ Other helpers:
 ```bash
 bash scripts/demo.sh                                          # build, test and a short guided demo
 python3 scripts/visualize_events.py /tmp/run.json -o events.svg  # event counts by type (SVG chart)
-python3 scripts/build_report.py                               # rebuild docs/technical_report.pdf
+make reports                                                  # the study's technical and general-reader reports as PDF
 ```
 
-`build_report.py` needs `python3-markdown` or `markdown-it-py`, plus `playwright` or a Chromium/Chrome binary. Step-by-step setup and troubleshooting: [`forensictrace/docs/deployment.md`](forensictrace/docs/deployment.md).
+The reports are `docs/technical_report.md` and `docs/report_for_general_readers.md`, a plain-language version for readers without a technical background. `make reports` (`scripts/build_report.py`) needs `python3-markdown` or `markdown-it-py`, plus `playwright` or a Chromium/Chrome binary. Step-by-step setup and troubleshooting: [`forensictrace/docs/deployment.md`](forensictrace/docs/deployment.md).
 
 ## 4. Scope alignment
 
@@ -130,17 +133,19 @@ Planned features come from the approved proposal (functional requirements FR1 to
 | Web dashboard | Not planned. Added on supervisor feedback: an analyst can investigate without reading JSON | Completed | `dashboard/`, `docs/dashboard.md`; `tests/test_dashboard.py` |
 | Incident reconstruction graph | Not planned. Added on supervisor feedback: causal relationships with evidence and confidence | Completed for the five scripted scenarios; scores are rule-based, not calibrated | `scripts/reconstruct.py`, `scenarios/scenario05_*`; `tests/test_reconstruct.py` |
 | Chain of custody | Not planned (hash chains were out of scope). Added on supervisor feedback | Completed: hash chain, event ids, timestamps, session ids, signed manifest, audit log, record-level verification | `src/custody.c`, `src/verify.c`, `docs/custody.md`; `tests/test_custody.py` |
+| Investigation reports | Not planned. A report for investigators and one for readers without a technical background, for every case | Completed: HTML and PDF from the dashboard or the command line | `scripts/case_report.py`; `tests/test_dashboard.py` |
+| Online demo | Not planned. Let others open the dashboard without installing it | Completed: read-only mode and Dockerfile for a hosting platform; tracing needs a Linux machine | `dashboard/server.py --public`, `Dockerfile`, `docs/deployment.md` |
 | Source address and protocol | Not planned. Needed by the network view | Completed in schema 3; published runs do not have it | `annotate_socket()` in `collector.c` |
 
 ## 5. Testing
 
-- **Functional and integration tests:** `make test` runs 120 checks. The first 23 are the original acceptance tests (build without warnings, CLI and validation, each configuration, correlation, integrity and tamper detection, end-to-end scenario, collection-mode equivalence).
+- **Functional and integration tests:** `make test` runs 127 checks: 23 original acceptance tests, 34 custody, 32 reconstruction and 38 dashboard checks. The 23 acceptance tests are the original ones (build without warnings, CLI and validation, each configuration, correlation, integrity and tamper detection, end-to-end scenario, collection-mode equivalence).
 - **Custody attacks:** `tests/test_custody.py` attacks a signed run: edited, deleted, reordered and duplicated records, a cut tail, a recomputed chain and sidecar, a re-signed manifest, a stripped signature, a downgrade to schema 2, an edited audit log. It also recomputes the chain in Python and checks the signature with stock OpenSSL.
 - **Reconstruction:** `tests/test_reconstruct.py` runs all five scenarios against their expected relations, plus negative controls (benign commands must raise no suspicion; uncollected evidence must stay unknown).
-- **Dashboard:** `tests/test_dashboard.py` drives the server against the real binary, including the security boundaries and an analyst's full journey from running a trace to exporting it.
+- **Dashboard:** `tests/test_dashboard.py` drives the server against the real binary, including the security boundaries, an analyst's full journey from running a trace to exporting it, both investigation reports (with a hostile file name) and the read-only public mode.
 - **Stress tests:** 150 concurrent processes traced without loss; the 20,000-event cap is enforced and flagged. This testing found and fixed a defect: processes beyond 64 concurrent were silently dropped.
 - **Error handling:** invalid configuration or mode, missing command, unwritable output path.
-- **Memory safety:** Valgrind and an AddressSanitizer/UBSan build (`make asan`) report no errors.
+- **Memory safety:** Valgrind (original engine) and an AddressSanitizer/UBSan build (`make asan`, including the custody, verify and export commands and malformed input) report no errors.
 - **Compatibility:** gcc 13 builds cleanly with `-Wall -Wextra -Wpedantic`. clang is not installed on the test machine and was not re-checked.
 - **Performance:** the 64-run experiments measure CPU, memory, wall time, storage and processing time against an unmonitored baseline.
 
@@ -151,8 +156,11 @@ Details and results are in the technical report.
 ```
 ForensicTrace_Capstone_Final/
 ├── README.md                     this file
+├── .github/workflows/ci.yml      build and test on every push
+├── .devcontainer/                ready-made environment for GitHub Codespaces
 └── forensictrace/
-    ├── Makefile                  build, test, asan targets
+    ├── Makefile                  all, test, asan, keys, dashboard and reports targets
+    ├── Dockerfile                read-only online demo of the dashboard
     ├── src/                      C11 source (one file per pipeline stage + forensictrace.h)
     │   ├── main.c                CLI, stage orchestration, timing
     │   ├── collector.c           ptrace and seccomp collection, syscall table, config filter
@@ -167,12 +175,14 @@ ForensicTrace_Capstone_Final/
     │   └── verify.c              evidence verification, audit log
     ├── dashboard/                local web dashboard (server.py + static/)
     ├── scenarios/                four study scenarios, one reconstruction demo, ground_truth/*.json
-    ├── scripts/                  setup, demo, evaluate, run_experiments, analyze, reconstruct, viewers
+    ├── scripts/                  setup, demo, evaluate, run_experiments, analyze, reconstruct,
+    │                             case_report (investigation reports), build_report (study reports), viewers
     ├── tests/                    run_tests.sh and the custody, reconstruction and dashboard suites
     ├── experiments/runs/, runs_seccomp/  64 raw experiment JSON files per mode, with sidecars and reports
     ├── results/, results_seccomp/  experiment summaries (CSV, summary, SVG chart)
     ├── README.md                 short guide to the application folder
-    └── docs/                     technical report (PDF), limitations, deployment, dashboard, custody, examples
+    └── docs/                     technical and general-reader reports (md + PDF), limitations, deployment,
+                                  dashboard, custody, screenshots, examples
 ```
 
 ## 7. Ethics and safety

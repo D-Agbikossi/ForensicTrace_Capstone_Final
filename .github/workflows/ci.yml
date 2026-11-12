@@ -1,0 +1,53 @@
+# Builds ForensicTrace, runs the test suites, a short experiment in both
+# collection modes and the statistics, and uploads the outputs as an artifact.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: forensictrace
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libssl-dev python3 curl \
+               python3-pandas python3-numpy python3-scipy
+
+      - name: Build (warnings are errors)
+        run: make clean && make CFLAGS="-Wall -Wextra -Wpedantic -Werror -std=c11 -O2 -D_GNU_SOURCE -I src"
+
+      - name: Acceptance tests
+        run: make test
+
+      - name: Trace a command and verify integrity
+        run: |
+          ./forensictrace --config C --output /tmp/run.json --report /tmp/run.md -- /bin/ls /tmp
+          sha256sum -c /tmp/run.json.sha256
+          python3 scripts/view_timeline.py /tmp/run.json | head -20
+
+      - name: Short experiment (1 repetition per mode) and statistics
+        run: |
+          python3 scripts/run_experiments.py --reps 1 --results-dir /tmp/ci/results --runs-dir /tmp/ci/runs
+          python3 scripts/run_experiments.py --reps 1 --mode seccomp --results-dir /tmp/ci/results_seccomp --runs-dir /tmp/ci/runs_seccomp
+          python3 scripts/analyze.py --results /tmp/ci/results/results.csv --out-dir /tmp/ci/results
+          python3 scripts/analyze.py --results /tmp/ci/results_seccomp/results.csv --out-dir /tmp/ci/results_seccomp
+
+      - name: Upload CI outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-outputs
+          path: |
+            /tmp/run.json
+            /tmp/run.md
+            /tmp/ci/results
+            /tmp/ci/results_seccomp

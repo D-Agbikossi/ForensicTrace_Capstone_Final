@@ -8,10 +8,15 @@ forensictrace binary for tracing, verification and export.
 Standard library only, so it runs on an isolated analysis machine.
 
   python3 dashboard/server.py [--port 8377] [--evidence-dir DIR] [--sign-key KEY]
+  python3 dashboard/server.py --public        # read-only demo for a hosting platform
 
-It binds to 127.0.0.1 only. Evidence is untrusted input (a trace can contain any
-file name), and starting a trace runs a program, so requests are restricted to
-this origin and state-changing calls need the token from /api/session.
+By default it binds to 127.0.0.1 only. Evidence is untrusted input (a trace can
+contain any file name), and starting a trace runs a program, so requests are
+restricted to this origin and state-changing calls need the token from /api/session.
+
+--public is for hosting: it listens on all interfaces (port from $PORT if set),
+accepts any Host header and refuses every state-changing request, so nothing can
+be traced, logged or exported. Hosting platforms block ptrace anyway.
 """
 import argparse
 import csv
@@ -22,6 +27,7 @@ import secrets
 import statistics
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -31,6 +37,7 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import reconstruct  # noqa: E402
+import case_report  # noqa: E402
 
 STATIC = Path(__file__).resolve().parent / "static"
 STATIC_FILES = {
@@ -90,6 +97,7 @@ class Store:
         self.cache = {}
         self.cache_lock = threading.Lock()
         self.run_lock = threading.Lock()
+        self.pdf_lock = threading.Lock()
         self.scenarios = self._load_scenarios()
 
     @staticmethod
@@ -210,6 +218,38 @@ class Store:
                     out["audit"].append({"action": "unreadable entry", "detail": line[:200]})
         return out
 
+    def case_report(self, case_id, kind, fmt):
+        """Technical or plain-language report for one case, as HTML or PDF (bytes, content type, file name)."""
+        if kind not in case_report.KINDS or fmt not in ("html", "pdf"):
+            raise ApiError(400, "kind must be technical or general, format html or pdf")
+        path, _writable, _root = self.resolve(case_id)
+        try:
+            verification = self.verify(case_id)
+        except ApiError:
+            verification = None        # engine not built: the report says it was not verified
+        try:
+            page = case_report.build(path, kind, verification=verification)
+        except (ValueError, KeyError, TypeError, AttributeError, IndexError) as err:
+            raise ApiError(422, f"evidence cannot be read: {err}") from err
+        name = f"{re.sub(r'[^A-Za-z0-9._-]', '_', path.stem)}_{kind}_report"
+        if fmt == "html":
+            return page.encode("utf-8"), "text/html; charset=utf-8", f"{name}.html"
+        with self.pdf_lock:
+            try:
+                out_dir = EXPORTS_DIR / "case_reports"
+                out_dir.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                out_dir = Path(tempfile.mkdtemp())
+            out = out_dir / f"{name}.pdf"
+            try:
+                case_report.html_to_pdf(page, out)
+                data = out.read_bytes()
+            except (RuntimeError, subprocess.SubprocessError) as err:
+                raise ApiError(503, f"{err}. Open the report in the browser and use Print, then Save as PDF.") from err
+            finally:
+                out.unlink(missing_ok=True)
+        return data, "application/pdf", f"{name}.pdf"
+
     def export(self, case_id, investigator):
         path, writable, root_key = self.resolve(case_id)
         if not writable:
@@ -287,6 +327,8 @@ class Store:
 class Handler(BaseHTTPRequestHandler):
     store = None
     port = 0
+    public = False          # read-only hosting mode
+    allowed_hosts = set()   # extra Host headers, e.g. a Codespaces forwarding address
     server_version = "ForensicTraceDashboard"
 
     def log_message(self, fmt, *args):
@@ -311,7 +353,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _host_ok(self):
         # A page on another site can point its own DNS name at 127.0.0.1; reject that.
-        return self.headers.get("Host", "") in (f"127.0.0.1:{self.port}", f"localhost:{self.port}")
+        # In public mode nothing can be changed, so any address may read.
+        host = self.headers.get("Host", "")
+        return self.public or host in (f"127.0.0.1:{self.port}", f"localhost:{self.port}") or host in self.allowed_hosts
 
     def _dispatch(self, fn):
         if not self._host_ok():
@@ -343,7 +387,7 @@ class Handler(BaseHTTPRequestHandler):
             name, ctype = STATIC_FILES[url.path]
             self._send(200, (STATIC / name).read_bytes(), ctype)
         elif url.path == "/api/session":
-            self._json({"token": store.token, "signing": bool(store.sign_key),
+            self._json({"token": store.token, "signing": bool(store.sign_key), "read_only": self.public,
                         "default_key": str(DEFAULT_KEY), "user": os.environ.get("USER", ""),
                         "binary": BINARY.is_file(), "config_names": CONFIG_NAMES,
                         "scenarios": {k: v["description"] for k, v in store.scenarios.items()}})
@@ -355,6 +399,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json(store.custody(q.get("id")))
         elif url.path == "/api/compare":
             self._json(store.compare(q.get("mode", "ptrace"), q.get("scenario", "ALL")))
+        elif url.path == "/api/case-report":
+            data, ctype, name = store.case_report(q.get("id"), q.get("kind", ""), q.get("format", "html"))
+            disposition = "inline" if ctype.startswith("text/html") else "attachment"
+            self._send(200, data, ctype, {"Content-Disposition": f'{disposition}; filename="{name}"'})
         elif url.path == "/api/report":
             path, _w, _k = store.resolve(q.get("id"))
             report = path.with_suffix(".md")
@@ -366,6 +414,8 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(404, "not found")
 
     def _post(self):
+        if self.public:
+            raise ApiError(403, "this is a read-only public demo: run ForensicTrace locally to trace or export")
         if self.headers.get("X-FT-Token") != self.store.token:
             raise ApiError(403, "missing session token")
         if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
@@ -393,7 +443,11 @@ def main():
     ap.add_argument("--evidence-dir", action="append", default=[], help="extra folder of evidence JSON files")
     ap.add_argument("--sign-key", help=f"Ed25519 key for new investigations (default {DEFAULT_KEY} if present)")
     ap.add_argument("--pubkey", help="public key that evidence must be signed by (default: the signing key's .pub)")
+    ap.add_argument("--public", action="store_true", help="read-only demo for a hosting platform (see above)")
+    ap.add_argument("--allow-host", action="append", default=[], help="also accept this Host header, e.g. name.example:443")
     args = ap.parse_args()
+    if args.public and os.environ.get("PORT"):
+        args.port = int(os.environ["PORT"])
 
     sign_key = Path(args.sign_key) if args.sign_key else (DEFAULT_KEY if DEFAULT_KEY.is_file() else None)
     pubkey = Path(args.pubkey) if args.pubkey else (Path(f"{sign_key}.pub") if sign_key else None)
@@ -401,10 +455,24 @@ def main():
         pubkey = None
     Handler.store = Store(args.evidence_dir, sign_key, pubkey)
     Handler.port = args.port
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    Handler.public = args.public
+    allowed = set(args.allow_host)
+    # GitHub Codespaces forwards the port through its own address, which needs GitHub sign-in
+    codespace, domain = os.environ.get("CODESPACE_NAME"), os.environ.get("GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN")
+    if codespace and domain:
+        allowed.add(f"{codespace}-{args.port}.{domain}")
+    Handler.allowed_hosts = allowed
+    if args.public:
+        Handler.store.roots = [(k, label, root, False) for k, label, root, _w in Handler.store.roots]
+    server = ThreadingHTTPServer(("0.0.0.0" if args.public else "127.0.0.1", args.port), Handler)
     server.daemon_threads = True
-    print(f"ForensicTrace dashboard: http://127.0.0.1:{args.port}")
-    if not sign_key:
+    if args.public:
+        print(f"ForensicTrace dashboard, read-only public demo, on port {args.port}")
+    else:
+        print(f"ForensicTrace dashboard: http://127.0.0.1:{args.port}")
+    for host in sorted(allowed):
+        print(f"Also accepting requests addressed to {host}")
+    if not sign_key and not args.public:
         print(f"New investigations will be UNSIGNED. Create a key with: make keys ({DEFAULT_KEY})")
     if not BINARY.is_file():
         print("forensictrace binary not found: run make to enable tracing and verification")
