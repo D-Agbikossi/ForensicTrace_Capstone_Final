@@ -15,3 +15,10 @@ __pycache__/
 forensictrace/cases/
 forensictrace/exports/
 *.key
+
+# Copies, archives and recordings of the project belong outside the repository
+*.zip
+*.mkv
+*.mp4
+*(Copy)*/
+ForensicTrace_Capstone_Final-main*/
