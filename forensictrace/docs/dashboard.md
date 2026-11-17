@@ -120,7 +120,7 @@ page. Starting a trace runs a program. So:
 - all evidence reaches the page as text nodes, and the content security policy blocks inline script;
 - study runs and examples are read-only, so viewing them never changes the repository.
 
-For hosting, `--public` turns this into a read-only demo: it listens on all interfaces and accepts any address, but refuses every request that would trace, log or export. `docs/deployment.md` step 9 gives the steps.
+For hosting, `--public` turns this into a read-only demo: it listens on all interfaces and accepts any address, but refuses every request that would trace, log or export. Adding `--allow-tracing` lets visitors trace the built-in scenarios only, one at a time with a pause between traces, and keeps only the newest investigations the server started (`--keep-cases`, default 20). At start-up it checks that `ptrace` is permitted, and stays read-only if not. `docs/deployment.md` step 9 gives the steps.
 
 Viewing a case verifies it without writing to its audit log. Only **Verify and log** and
 **Export** add entries. There is no login, so anyone with a local account on the machine can reach

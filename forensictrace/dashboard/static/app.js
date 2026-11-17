@@ -1105,7 +1105,9 @@ function renderCustody(view) {
       e.target.disabled = false;
     } }, "Export evidence bundle") : null,
     state.data && state.data.has_report ? h("a", { href: `/api/report?id=${encodeURIComponent(id)}`, download: "" }, h("button", null, "Engine report (Markdown)")) : null)
-    : h("p", { cls: "hint", style: "margin-top:8px" }, "This is read-only reference data, so verifying here adds nothing to its audit log.");
+    : h("p", { cls: "hint", style: "margin-top:8px" }, state.session.public
+      ? "In the online demo, verifying here adds nothing to the audit log. Run ForensicTrace locally to log checks or export a bundle."
+      : "This is read-only reference data, so verifying here adds nothing to its audit log.");
 
   const auditCard = c.audit.length ? card("Audit log", "Hash-chained record of who did what to this evidence",
     h("div", { cls: "table-wrap" }, h("table", null,
@@ -1249,6 +1251,9 @@ async function main() {
       $("new-investigation").hidden = true;
       $("main").insertBefore(notice("info", "Read-only demo",
         "This online copy shows recorded evidence only. To run new investigations, run ForensicTrace on a Linux machine."), $("case-header"));
+    } else if (state.session.public) {
+      $("main").insertBefore(notice("info", "Online demo",
+        "You can trace the built-in scenarios here. Investigations are visible to everyone with this link, only the newest are kept, and all are deleted when the server restarts. Verifying with an audit entry and exporting need a local installation."), $("case-header"));
     }
     const wanted = readHash();
     await loadCases();

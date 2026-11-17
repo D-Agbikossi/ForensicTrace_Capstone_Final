@@ -129,15 +129,22 @@ There are two ways, and they do different things:
 | | Render (public link) | GitHub Codespaces (full tool) |
 |---|---|---|
 | Who can open it | Anyone with the link | Only you, signed in to GitHub |
-| New investigations | No: read-only demo | Yes, if the codespace allows tracing |
-| Shows | Demo case, 128 study runs, comparison, custody, reports | Everything |
+| New investigations | The five built-in scenarios only | Yes, any command, if the codespace allows tracing |
+| Shows | Demo case, 128 study runs, visitors' investigations, comparison, custody, reports | Everything |
 | Cost | Free web service; it sleeps when idle | Free monthly allowance for personal accounts |
 
 Free tiers change, so check each platform's current terms before relying on them.
 
-### Option A: public read-only demo on Render
+### Option A: public demo on Render
 
-Hosting platforms block `ptrace`, so the online copy shows recorded evidence and verifies it but cannot trace. `dashboard/server.py --public` listens on all interfaces, reads the port from `$PORT`, and refuses every request that would run, log or export anything.
+The container runs `dashboard/server.py --public --allow-tracing`. It listens on all interfaces and reads the port from `$PORT`. Visitors can open the recorded evidence and trace the five built-in scenarios under any configuration and mode, but cannot run a command of their own, export, or add audit entries.
+
+- **One trace at a time:** traces run one after another, with a 10-second pause between them.
+- **Newest 20 kept:** only the 20 newest investigations are kept, and all of them disappear when the service restarts.
+- **Signing key:** each container creates its own signing key when it starts, so online evidence is signed and verifies as "signed by trusted key". The key never leaves the container.
+- **Fallback:** a test trace at start-up checks that the host permits `ptrace`. If it does not, the demo starts read-only and says so.
+
+Tracing was tested in Docker with Render's free limits (0.1 CPU, 512 MB): a scenario takes about 20 to 30 seconds there, against under a second on a laptop. The scenarios' local servers start slowly on such a small machine, so the image sets `FT_CURL_RETRY` to make `curl` wait for them. The study never set it, so the scenarios behave as they did for the published runs.
 
 1. Commit and push the repository to GitHub, including `forensictrace/Dockerfile` and `forensictrace/.dockerignore`.
 2. Optional check on your laptop:
@@ -146,7 +153,7 @@ Hosting platforms block `ptrace`, so the online copy shows recorded evidence and
    docker build -t forensictrace-demo .
    docker run --rm -e PORT=10000 -p 8390:10000 forensictrace-demo
    ```
-   Open http://127.0.0.1:8390. You should see a "Read-only demo" notice.
+   Add `--cpus 0.1 --memory 512m` to `docker run` to try it with the free tier's limits. Open http://127.0.0.1:8390. You should see an "Online demo" notice, and **New investigation** should trace a scenario.
 3. Create a free account at https://render.com and sign in with GitHub.
 4. Select **New** > **Web Service**, then connect the `ForensicTrace_Capstone_Final` repository.
 5. Fill in:
@@ -157,10 +164,10 @@ Hosting platforms block `ptrace`, so the online copy shows recorded evidence and
 
    Leave the start command empty; the Dockerfile sets it.
 6. Select **Create Web Service** and wait for the build log to show
-   `ForensicTrace dashboard, read-only public demo, on port ...`.
+   `ForensicTrace dashboard, public demo with tracing of the built-in scenarios, on port ...`. If it says `read-only public demo` instead, the platform blocked `ptrace`; everything else still works.
 7. Open the `https://<name>.onrender.com` address Render shows. A free service sleeps after a period without visits, so the first visit afterwards can take about a minute.
 
-Every push to the branch redeploys it. Before sharing the link, remember that the evidence files contain your Linux user name, host name and file paths.
+Every push to the branch redeploys it. Anyone with the link can start traces, which uses your free hours, and can type any investigator name or case ID, which other visitors see. Before sharing the link, remember that the evidence files contain your Linux user name, host name and file paths.
 
 ### Option B: the full tool in GitHub Codespaces
 

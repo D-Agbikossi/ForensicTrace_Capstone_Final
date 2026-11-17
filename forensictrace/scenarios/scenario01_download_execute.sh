@@ -13,10 +13,13 @@ EOF
 
 python3 -m http.server 8765 --directory "$WORKDIR" >/dev/null 2>&1 &
 SERVER=$!
+# FT_CURL_RETRY (unset in the study) lets a slow host, such as the online demo, retry until the
+# local server is up. The trap stops the servers if a step fails, so the trace always ends.
+trap 'kill $SERVER 2>/dev/null || true' EXIT
 sleep 0.5
 
 # Ground truth actions:
-curl -s -o downloaded.sh "http://127.0.0.1:8765/payload.sh"
+curl -s ${FT_CURL_RETRY:-} -o downloaded.sh "http://127.0.0.1:8765/payload.sh"
 chmod +x downloaded.sh
 ./downloaded.sh
 

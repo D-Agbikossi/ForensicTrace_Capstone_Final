@@ -71,14 +71,14 @@ Use **`Makefile`** in this directory (`make`). There is only one build file.
 ```
 src/              C source (collector, normaliser, correlator, reconstructor, report, metrics, JSON, integrity, custody, verify)
 dashboard/        Local web dashboard: server.py + static/
-tests/            run_tests.sh and the custody, reconstruction and dashboard suites (127 checks)
+tests/            run_tests.sh and the custody, reconstruction and dashboard suites (129 checks)
 scenarios/        Four study scenarios, one reconstruction demo, ground_truth/*.json
 scripts/          setup, demo, evaluate, run_experiments, analyze, reconstruct, case_report, svgchart, viewers, build_report
 experiments/      Raw evidence of the 64-run experiments (runs/ = ptrace, runs_seccomp/ = seccomp)
 results/          ptrace results: CSV, summary.md, tradeoff.svg, environment.json
 results_seccomp/  seccomp results, same layout
 docs/             Technical and general-reader reports (md + PDF), limitations, deployment, dashboard, custody, screenshots, examples
-Dockerfile        Read-only online demo of the dashboard
+Dockerfile        Online demo of the dashboard (built-in scenarios can be traced)
 ```
 
 ## Documentation

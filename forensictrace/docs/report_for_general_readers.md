@@ -49,7 +49,7 @@ Each attack was recorded at all four levels, four times each: 64 recordings. Eac
 
 A fifth, longer attack was added later to demonstrate the map of the incident: a suspicious script downloads a harmful file, runs it, changes two files and contacts a second computer.
 
-The software itself is checked by **127 automatic tests**. Nineteen of them deliberately tamper with the evidence in different ways, and the tool caught every one.
+The software itself is checked by **129 automatic tests**. Nineteen of them deliberately tamper with the evidence in different ways, and the tool caught every one.
 
 ## 4. What was found
 

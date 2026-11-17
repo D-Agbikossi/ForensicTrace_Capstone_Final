@@ -44,7 +44,7 @@ Manual steps:
 sudo apt install -y build-essential libssl-dev python3 curl valgrind \
      python3-pandas python3-numpy python3-scipy
 make clean && make             # builds ./forensictrace with -Wall -Wextra
-make test                      # expect: 127 passed, 0 failed
+make test                      # expect: 129 passed, 0 failed
 ```
 
 Trace a command, verify the evidence and read the timeline:
@@ -139,10 +139,10 @@ Planned features come from the approved proposal (functional requirements FR1 to
 
 ## 5. Testing
 
-- **Functional and integration tests:** `make test` runs 127 checks: 23 original acceptance tests, 34 custody, 32 reconstruction and 38 dashboard checks. The 23 acceptance tests are the original ones (build without warnings, CLI and validation, each configuration, correlation, integrity and tamper detection, end-to-end scenario, collection-mode equivalence).
+- **Functional and integration tests:** `make test` runs 129 checks: 23 original acceptance tests, 34 custody, 32 reconstruction and 40 dashboard checks. The 23 acceptance tests are the original ones (build without warnings, CLI and validation, each configuration, correlation, integrity and tamper detection, end-to-end scenario, collection-mode equivalence).
 - **Custody attacks:** `tests/test_custody.py` attacks a signed run: edited, deleted, reordered and duplicated records, a cut tail, a recomputed chain and sidecar, a re-signed manifest, a stripped signature, a downgrade to schema 2, an edited audit log. It also recomputes the chain in Python and checks the signature with stock OpenSSL.
 - **Reconstruction:** `tests/test_reconstruct.py` runs all five scenarios against their expected relations, plus negative controls (benign commands must raise no suspicion; uncollected evidence must stay unknown).
-- **Dashboard:** `tests/test_dashboard.py` drives the server against the real binary, including the security boundaries, an analyst's full journey from running a trace to exporting it, both investigation reports (with a hostile file name) and the read-only public mode.
+- **Dashboard:** `tests/test_dashboard.py` drives the server against the real binary, including the security boundaries, an analyst's full journey from running a trace to exporting it, both investigation reports (with a hostile file name) and both public modes, read-only and tracing of the built-in scenarios.
 - **Stress tests:** 150 concurrent processes traced without loss; the 20,000-event cap is enforced and flagged. This testing found and fixed a defect: processes beyond 64 concurrent were silently dropped.
 - **Error handling:** invalid configuration or mode, missing command, unwritable output path.
 - **Memory safety:** Valgrind (original engine) and an AddressSanitizer/UBSan build (`make asan`, including the custody, verify and export commands and malformed input) report no errors.
@@ -160,7 +160,7 @@ ForensicTrace_Capstone_Final/
 ├── .devcontainer/                ready-made environment for GitHub Codespaces
 └── forensictrace/
     ├── Makefile                  all, test, asan, keys, dashboard and reports targets
-    ├── Dockerfile                read-only online demo of the dashboard
+    ├── Dockerfile                online demo of the dashboard (built-in scenarios can be traced)
     ├── src/                      C11 source (one file per pipeline stage + forensictrace.h)
     │   ├── main.c                CLI, stage orchestration, timing
     │   ├── collector.c           ptrace and seccomp collection, syscall table, config filter

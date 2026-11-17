@@ -9,6 +9,7 @@ Standard library only, so it runs on an isolated analysis machine.
 
   python3 dashboard/server.py [--port 8377] [--evidence-dir DIR] [--sign-key KEY]
   python3 dashboard/server.py --public        # read-only demo for a hosting platform
+  python3 dashboard/server.py --public --allow-tracing   # hosted demo that can trace the built-in scenarios
 
 By default it binds to 127.0.0.1 only. Evidence is untrusted input (a trace can
 contain any file name), and starting a trace runs a program, so requests are
@@ -16,10 +17,17 @@ restricted to this origin and state-changing calls need the token from /api/sess
 
 --public is for hosting: it listens on all interfaces (port from $PORT if set),
 accepts any Host header and refuses every state-changing request, so nothing can
-be traced, logged or exported. Hosting platforms block ptrace anyway.
+be traced, logged or exported.
+
+--allow-tracing (with --public) also lets visitors trace the built-in scenario
+scripts, and nothing else: no command of their own, no export, no audit entries on
+existing evidence. One trace runs at a time, with a pause between traces, and only
+the newest investigations are kept. At start-up a test trace checks that this host
+permits ptrace; if it does not, the demo stays read-only.
 """
 import argparse
 import csv
+import glob
 import json
 import os
 import re
@@ -99,6 +107,10 @@ class Store:
         self.run_lock = threading.Lock()
         self.pdf_lock = threading.Lock()
         self.scenarios = self._load_scenarios()
+        self.max_cases = None       # public tracing: keep only the newest investigations
+        self.cooldown = 0           # public tracing: seconds between two traces
+        self.last_run = 0.0
+        self.created = []           # investigations started by this server, oldest first
 
     @staticmethod
     def _load_scenarios():
@@ -289,14 +301,34 @@ class Store:
         cmd += ["--", "bash", str(self.scenarios[scenario]["script"].relative_to(ROOT))]
         # Scenarios use fixed ports and work directories, so one runs at a time.
         if not self.run_lock.acquire(blocking=False):
-            raise ApiError(409, "another investigation is running")
+            raise ApiError(409, "another investigation is running, try again in a moment")
         try:
-            p = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=180, cwd=ROOT)
+            wait = self.last_run + self.cooldown - time.monotonic()
+            if wait > 0:
+                raise ApiError(429, f"please wait {int(wait) + 1} s before starting another investigation")
+            try:
+                p = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=180, cwd=ROOT)
+            finally:
+                self.last_run = time.monotonic()
         finally:
             self.run_lock.release()
         if p.returncode != 0 or not output.is_file():
             raise ApiError(500, "tracing failed: " + (p.stderr.strip()[-300:] or "no output"))
+        self.created.append(output)
+        if self.max_cases:
+            self.prune_cases(self.max_cases)
         return {"id": f"cases/{output.name}", "signed": bool(self.sign_key)}
+
+    def prune_cases(self, keep):
+        """Delete all but the newest `keep` investigations this server started, with their
+        sidecar files. Evidence it did not create is never touched."""
+        while len(self.created) > keep:
+            old = self.created.pop(0)
+            for f in CASES_DIR.glob(glob.escape(old.stem) + ".*"):
+                f.unlink(missing_ok=True)
+        with self.cache_lock:
+            self.cache.clear()
+
 
     def compare(self, mode, scenario):
         name = "results" if mode == "ptrace" else "results_seccomp"
@@ -324,10 +356,25 @@ class Store:
                 "scenarios": sorted({r["scenario"] for r in rows}) if scenario != "ALL" else None}
 
 
+def tracing_works():
+    """Trace /bin/true once, to find out whether this host permits ptrace."""
+    if not BINARY.is_file():
+        return False
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "probe.json"
+        try:
+            p = subprocess.run([str(BINARY), "--config", "A", "--output", str(out), "--quiet", "--", "/bin/true"],
+                               capture_output=True, timeout=30)
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return p.returncode == 0 and out.is_file()
+
+
 class Handler(BaseHTTPRequestHandler):
     store = None
     port = 0
-    public = False          # read-only hosting mode
+    public = False          # hosting mode: read-only unless can_trace
+    can_trace = True        # may visitors start an investigation
     allowed_hosts = set()   # extra Host headers, e.g. a Codespaces forwarding address
     server_version = "ForensicTraceDashboard"
 
@@ -387,7 +434,8 @@ class Handler(BaseHTTPRequestHandler):
             name, ctype = STATIC_FILES[url.path]
             self._send(200, (STATIC / name).read_bytes(), ctype)
         elif url.path == "/api/session":
-            self._json({"token": store.token, "signing": bool(store.sign_key), "read_only": self.public,
+            self._json({"token": store.token, "signing": bool(store.sign_key), "read_only": self.public and not self.can_trace,
+                        "public": self.public, "can_trace": self.can_trace,
                         "default_key": str(DEFAULT_KEY), "user": os.environ.get("USER", ""),
                         "binary": BINARY.is_file(), "config_names": CONFIG_NAMES,
                         "scenarios": {k: v["description"] for k, v in store.scenarios.items()}})
@@ -414,8 +462,9 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(404, "not found")
 
     def _post(self):
-        if self.public:
-            raise ApiError(403, "this is a read-only public demo: run ForensicTrace locally to trace or export")
+        path = urlparse(self.path).path
+        if self.public and not (self.can_trace and path == "/api/investigate"):
+            raise ApiError(403, "the online demo can only trace the built-in scenarios: run ForensicTrace locally to verify, log or export")
         if self.headers.get("X-FT-Token") != self.store.token:
             raise ApiError(403, "missing session token")
         if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
@@ -424,7 +473,6 @@ class Handler(BaseHTTPRequestHandler):
         if length > 65536:
             raise ApiError(413, "request too large")
         body = json.loads(self.rfile.read(length) or b"{}")
-        path = urlparse(self.path).path
         who = str(body.get("investigator", "")).strip()[:100]
         if path == "/api/verify":
             self._json(self.store.verify(body.get("id"), audit=True, investigator=who or None))
@@ -444,6 +492,8 @@ def main():
     ap.add_argument("--sign-key", help=f"Ed25519 key for new investigations (default {DEFAULT_KEY} if present)")
     ap.add_argument("--pubkey", help="public key that evidence must be signed by (default: the signing key's .pub)")
     ap.add_argument("--public", action="store_true", help="read-only demo for a hosting platform (see above)")
+    ap.add_argument("--allow-tracing", action="store_true", help="with --public, let visitors trace the built-in scenarios")
+    ap.add_argument("--keep-cases", type=int, default=20, help="with --allow-tracing, investigations kept (default 20)")
     ap.add_argument("--allow-host", action="append", default=[], help="also accept this Host header, e.g. name.example:443")
     args = ap.parse_args()
     if args.public and os.environ.get("PORT"):
@@ -462,12 +512,20 @@ def main():
     if codespace and domain:
         allowed.add(f"{codespace}-{args.port}.{domain}")
     Handler.allowed_hosts = allowed
+    Handler.can_trace = not args.public
     if args.public:
         Handler.store.roots = [(k, label, root, False) for k, label, root, _w in Handler.store.roots]
+        if args.allow_tracing:
+            Handler.can_trace = tracing_works()
+            Handler.store.max_cases = max(1, args.keep_cases)
+            Handler.store.cooldown = 10
+            if not Handler.can_trace:
+                print("This host does not permit ptrace: the demo stays read-only")
     server = ThreadingHTTPServer(("0.0.0.0" if args.public else "127.0.0.1", args.port), Handler)
     server.daemon_threads = True
     if args.public:
-        print(f"ForensicTrace dashboard, read-only public demo, on port {args.port}")
+        kind = "public demo with tracing of the built-in scenarios" if Handler.can_trace else "read-only public demo"
+        print(f"ForensicTrace dashboard, {kind}, on port {args.port}")
     else:
         print(f"ForensicTrace dashboard: http://127.0.0.1:{args.port}")
     for host in sorted(allowed):

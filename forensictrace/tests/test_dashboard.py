@@ -231,6 +231,50 @@ def main():
             public.terminate()
             public.communicate(timeout=5)
 
+        # ---- public mode with tracing of the built-in scenarios only -------------
+        port = free_port()
+        env = dict(os.environ, PORT=str(port))
+        public = subprocess.Popen([sys.executable, str(ROOT / "dashboard" / "server.py"), "--public", "--allow-tracing",
+                                   "--keep-cases", "1"], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, env=env)
+        web = Client(port)
+        made = []
+        try:
+            for _ in range(100):
+                try:
+                    web.request("GET", "/api/session")
+                    break
+                except OSError:
+                    time.sleep(0.1)
+            host = {"Host": "forensictrace.example.org"}
+            _, sess, _ = web.request("GET", "/api/session", headers=host)
+            web.token = sess.get("token")
+            body = {"scenario": "scenario04", "config": "C", "mode": "ptrace", "case_id": "PUBTEST", "investigator": "Visitor"}
+            blocked = [web.request("POST", path, {"id": "examples/custody_demo/demo_scenario05.json"}, headers=host)[0]
+                       for path in ("/api/verify", "/api/export")]
+            st1, r1, _ = web.request("POST", "/api/investigate", body, headers=host)
+            st_fast, _, _ = web.request("POST", "/api/investigate", body, headers=host)
+            st_bad, _, _ = web.request("POST", "/api/investigate", dict(body, scenario="../../bin/sh"), headers=host)
+            if st1 == 200:
+                made.append(r1["id"])
+            report(sess.get("can_trace") and not sess.get("read_only") and blocked == [403, 403] and st1 == 200
+                   and st_fast == 429 and st_bad == 400,
+                   "public tracing: built-in scenarios run, a pause is enforced, nothing else can run or change",
+                   f"{sess.get('can_trace')} {blocked} {st1} {st_fast} {st_bad}")
+            time.sleep(10.5)
+            st2, r2, _ = web.request("POST", "/api/investigate", body, headers=host)
+            if st2 == 200:
+                made.append(r2["id"])
+            first_gone = bool(made) and not (ROOT / made[0]).exists()
+            report(st2 == 200 and first_gone and (ROOT / made[-1]).exists(),
+                   "public tracing: only the newest investigations it started are kept")
+        finally:
+            public.terminate()
+            public.communicate(timeout=5)
+            for case_id in made:
+                stem = Path(case_id).stem
+                for f in (ROOT / "cases").glob(stem + ".*"):
+                    f.unlink()
+
     return 1 if failures else 0
 
 
